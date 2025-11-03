@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const nextConfig = {
+const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "www.lovesrilanka.org" },
@@ -11,7 +11,7 @@ const nextConfig = {
       { protocol: "https", hostname: "www.sundayobserver.lk" },
       { protocol: "https", hostname: "upload.wikimedia.org" },
     ],
-     domains: [
+    domains: [
       "upload.wikimedia.org",
       "dynamic-media-cdn.tripadvisor.com",
       "media-cdn.tripadvisor.com",
@@ -30,7 +30,7 @@ const nextConfig = {
     ],
     unoptimized: true,
   },
-  output: "export",
+  reactStrictMode: true,
 };
 
-export default nextConfig;
+module.exports = nextConfig;

@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface Place {
   id: string;
@@ -16,9 +16,9 @@ interface Place {
 export default function HomePage() {
   const router = useRouter();
   const [location, setLocation] = useState("Detecting...");
-  const [places, setPlaces] = useState<Place[]>([]); 
+  const [places, setPlaces] = useState<Place[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Place[]>([]); 
+  const [searchResults, setSearchResults] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
 
   const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
@@ -233,7 +233,11 @@ export default function HomePage() {
               <div
                 key={place.id}
                 onClick={() =>
-                  router.push(`/place/${place.id}?lat=${place.lat}&lon=${place.lon}`)
+                  router.push(
+                    `/place/${place.id}?lat=${place.lat}&lon=${place.lon}&image=${encodeURIComponent(
+                      place.image || ""
+                    )}`
+                  )
                 }
                 className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
               >
@@ -267,7 +271,11 @@ export default function HomePage() {
             <div
               key={place.id}
               onClick={() =>
-                router.push(`/place/${place.id}?lat=${place.lat}&lon=${place.lon}`)
+                router.push(
+                  `/place/${place.id}?lat=${place.lat}&lon=${place.lon}&image=${encodeURIComponent(
+                    place.image || ""
+                  )}`
+                )
               }
               className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
             >

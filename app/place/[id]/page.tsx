@@ -1,25 +1,35 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 
 export default function PlaceDetails() {
-  const { id } = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
+  const lat = searchParams.get("lat");
+  const lon = searchParams.get("lon");
+  const image = searchParams.get("image");
+
   const [place, setPlace] = useState<any>(null);
 
   useEffect(() => {
-    async function getPlaceDetails() {
-      const apiKey = "YOUR_GOOGLE_MAPS_API_KEY";
+    if (!lat || !lon) return;
+
+    async function fetchPlaceDetails() {
       const res = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${id}&key=${apiKey}`
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
       );
       const data = await res.json();
-      setPlace(data.result);
+      setPlace({
+        name: data.name || data.display_name || "Unknown Place",
+        address: data.display_name || "",
+      });
     }
 
-    getPlaceDetails();
-  }, [id]);
+    fetchPlaceDetails();
+  }, [lat, lon]);
 
   if (!place) return <div className="p-10 text-center">Loading...</div>;
 
@@ -33,23 +43,16 @@ export default function PlaceDetails() {
           ← Back
         </button>
 
-        {place.photos?.length > 0 && (
-          <div className="rounded-2xl overflow-hidden shadow-md mb-4 aspect-[16/9]">
-            <img
-              src={`https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photoreference=${place.photos[0].photo_reference}&key=YOUR_GOOGLE_MAPS_API_KEY`}
-              alt={place.name}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        )}
+        <div className="rounded-2xl overflow-hidden shadow-md mb-4 aspect-[16/9] bg-gray-200 flex items-center justify-center">
+          {image ? (
+            <img src={image} alt={place.name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-gray-500">No image available</span>
+          )}
+        </div>
 
         <h1 className="text-3xl font-bold text-[#16a085] mb-3">{place.name}</h1>
-        <p className="text-gray-800 leading-relaxed text-base">
-          {place.formatted_address}
-        </p>
-        <p className="mt-2 text-gray-600">
-          ⭐ Rating: {place.rating || "N/A"} ({place.user_ratings_total || 0} reviews)
-        </p>
+        <p className="text-gray-800 leading-relaxed text-base">{place.address}</p>
       </div>
     </div>
   );
