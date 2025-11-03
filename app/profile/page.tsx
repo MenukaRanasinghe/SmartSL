@@ -105,7 +105,7 @@ export default function ProfilePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             uid: user.uid,
-            email: user.email || null, 
+            email: user.email || null,
             preferences: next,
           }),
         },
@@ -123,31 +123,51 @@ export default function ProfilePage() {
       console.error("Save API error:", e);
       setMsg({
         type: "error",
-        text:
-          e?.name === "AbortError"
-            ? "Request timed out. Please try again."
-            : e?.message || "Save failed.",
+        text: e?.name === "AbortError" ? "Request timed out. Please try again." : e?.message || "Save failed.",
       });
     } finally {
       setSaving(false);
     }
   };
 
+  const emailLabel = user?.email ?? (user ? "Anonymous" : "—");
+
   return (
-    <div className="max-w-xl">
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="text-2xl font-semibold">Profile</h2>
-        <span className="text-sm text-gray-600">
-          {user?.email ?? (user ? "Anonymous" : "—")}
-        </span>
+    <div className="mx-auto max-w-2xl p-4 sm:p-6">
+      <div className="mb-3 flex items-end justify-between">
+        <h2 className="text-2xl font-semibold tracking-tight text-gray-900">Profile</h2>
+
+        <div className="flex justify-end">
+          <span
+            title={emailLabel}
+            className="inline-flex max-w-[60vw] items-center gap-2 truncate rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700"
+          >
+            <svg
+              aria-hidden
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M4 4h16v16H4z" opacity="0.2" />
+              <path d="M4 7l8 5 8-5" />
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+            </svg>
+            <span className="truncate">{emailLabel}</span>
+          </span>
+        </div>
       </div>
 
-      <p className="text-gray-600 mb-6">Saved places and preferences will appear here.</p>
+      <p className="mb-6 text-sm text-gray-600">Saved places and preferences will appear here.</p>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">Your preferences</h3>
-          <button onClick={openModal} className="text-sm text-[#16a085] hover:underline">
+          <button
+            onClick={openModal}
+            className="text-sm font-medium text-[#16a085] hover:underline"
+          >
             Add preferences
           </button>
         </div>
@@ -159,7 +179,7 @@ export default function ProfilePage() {
             {prefs.map((p) => (
               <span
                 key={p}
-                className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 capitalize"
+                className="capitalize text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200"
               >
                 {p}
               </span>
@@ -169,14 +189,18 @@ export default function ProfilePage() {
           <p className="mt-4 text-sm text-gray-500">No preferences yet.</p>
         )}
 
-        {msg.type === "error" && <p className="mt-3 text-sm text-rose-700">⚠️ {msg.text}</p>}
-        {msg.type === "success" && <p className="mt-3 text-sm text-emerald-700">✅ {msg.text}</p>}
+        {msg.type === "error" && (
+          <p className="mt-3 text-sm text-rose-700">⚠️ {msg.text}</p>
+        )}
+        {msg.type === "success" && (
+          <p className="mt-3 text-sm text-emerald-700">✅ {msg.text}</p>
+        )}
       </div>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-5">
-            <div className="flex items-center justify-between mb-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
               <h4 className="text-lg font-semibold text-gray-900">Add preferences</h4>
               <button
                 aria-label="Close"
@@ -188,7 +212,9 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            <p className="text-sm text-gray-600 mb-3">Choose the categories you’re interested in:</p>
+            <p className="mb-3 text-sm text-gray-600">
+              Choose the categories you’re interested in:
+            </p>
 
             <div className="grid grid-cols-1 gap-2">
               {CATEGORIES.map((cat) => {
@@ -196,11 +222,11 @@ export default function ProfilePage() {
                 return (
                   <button
                     key={cat}
-                    onClick={() => toggleDraft(cat)}
-                    className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm capitalize ${
+                    onClick={() => setDraft((d) => (active ? d.filter((x) => x !== cat) : [...d, cat]))}
+                    className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm capitalize ${
                       active
-                        ? "bg-emerald-50 border-emerald-300 text-emerald-800"
-                        : "bg-white border-gray-200 text-gray-800 hover:bg-gray-50"
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                        : "border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
                     }`}
                     disabled={saving}
                   >
@@ -211,10 +237,10 @@ export default function ProfilePage() {
               })}
             </div>
 
-            <div className="flex items-center justify-end gap-2 mt-5">
+            <div className="mt-5 flex items-center justify-end gap-2">
               <button
                 onClick={() => setOpen(false)}
-                className="px-4 py-2 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50"
+                className="rounded-md border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50"
                 disabled={saving}
               >
                 Cancel
@@ -222,7 +248,7 @@ export default function ProfilePage() {
               <button
                 onClick={save}
                 disabled={saving}
-                className={`px-4 py-2 rounded-md text-white ${
+                className={`rounded-md px-4 py-2 text-white ${
                   saving ? "bg-gray-300" : "bg-[#16a085] hover:bg-[#13856d]"
                 }`}
               >
