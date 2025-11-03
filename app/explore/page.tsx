@@ -23,10 +23,10 @@ const textColors: Record<BusyLevel, string> = {
 };
 
 const pinIcons: Record<BusyLevel, string> = {
-  Quiet: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
-  Moderate: "https://maps.google.com/mapfiles/ms/icons/yellow-dot.png",
-  Busy: "https://maps.google.com/mapfiles/ms/icons/orange-dot.png",
-  "Very Busy": "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
+  Quiet: "https://img.icons8.com/?size=100&id=86830&format=png&color=16a34a",     
+  Moderate: "https://img.icons8.com/?size=100&id=86830&format=png&color=eab308",  
+  Busy: "https://img.icons8.com/?size=100&id=86830&format=png&color=f97316",     
+  "Very Busy": "https://img.icons8.com/?size=100&id=86830&format=png&color=dc2626", 
 };
 
 export default function ExplorePage() {
