@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface Place {
@@ -13,6 +13,12 @@ interface Place {
   description?: string;
   busyLevel?: string;
 }
+
+type Busy = "Quiet" | "Moderate" | "Busy" | "Very Busy" | "";
+
+const NEAREST_CITY_ALIAS: Record<string, string[]> = {
+  mampe: ["Piliyandala", "Kesbewa"],
+};
 
 export default function HomePage() {
   const router = useRouter();
@@ -34,59 +40,193 @@ export default function HomePage() {
   const [detectingCity, setDetectingCity] = useState<boolean>(false);
 
   const [showDetectedModal, setShowDetectedModal] = useState(false);
-  const [detectedBusy, setDetectedBusy] = useState<"Quiet" | "Moderate" | "Busy" | "Very Busy" | "">("");
+  const [detectedBusy, setDetectedBusy] = useState<Busy>("");
 
   const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
 
-  const fetchPlaceImage = async (name: string): Promise<string> => {
-    const cacheKey = `img-${name}`;
+  const buildDetectedImageQueries = (detectedName: string, addr: any): string[] => {
+    const dn = (detectedName || "").toLowerCase();
+    const aliasMatch = Object.entries(NEAREST_CITY_ALIAS).find(([alias]) => dn.includes(alias));
+    const aliasCities = aliasMatch ? aliasMatch[1] : [];
+
+    const addrParts = [
+      addr?.city,
+      addr?.town,
+      addr?.municipality,
+      addr?.state_district,
+      addr?.county,
+    ].filter(Boolean) as string[];
+
+    return [
+      ...aliasCities,
+      ...addrParts,
+      detectedName,
+      "Colombo",
+    ]
+      .filter(Boolean)
+      .map((s) => s.trim())
+      .filter((v, i, a) => a.findIndex((x) => x.toLowerCase() === v.toLowerCase()) === i);
+  };
+
+  const fetchPlaceImageByName = async (queries: string[] | string): Promise<string> => {
+    const list = Array.isArray(queries) ? queries : [queries];
+    const cacheKey = `img-name-${list.join("|")}`;
+
     try {
       if (typeof window !== "undefined") {
         const cached = localStorage.getItem(cacheKey);
         if (cached) return cached;
       }
 
-      try {
-        const q = `${name} Sri Lanka`;
-        const wikiURL = new URL("https://en.wikipedia.org/w/api.php");
-        wikiURL.searchParams.set("action", "query");
-        wikiURL.searchParams.set("format", "json");
-        wikiURL.searchParams.set("origin", "*");
-        wikiURL.searchParams.set("prop", "pageimages");
-        wikiURL.searchParams.set("generator", "search");
-        wikiURL.searchParams.set("gsrsearch", q);
-        wikiURL.searchParams.set("gsrlimit", "1");
-        wikiURL.searchParams.set("piprop", "thumbnail");
-        wikiURL.searchParams.set("pithumbsize", "1000");
+      for (const raw of list) {
+        const q = `${raw} Sri Lanka`;
 
-        const wr = await fetch(wikiURL.toString(), { cache: "no-store" });
-        const wj = await wr.json();
-        const pages = wj?.query?.pages ? Object.values(wj.query.pages as any) : [];
-        const wikiThumb: string | undefined = pages?.[0]?.thumbnail?.source;
-        if (wikiThumb) {
-          if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
-          return wikiThumb;
-        }
-      } catch {}
-
-      if (UNSPLASH_KEY) {
         try {
-          const u = new URL("https://api.unsplash.com/search/photos");
-          u.searchParams.set("query", `${name} Sri Lanka`);
-          u.searchParams.set("client_id", UNSPLASH_KEY);
-          u.searchParams.set("per_page", "1");
-          const r = await fetch(u.toString(), { cache: "no-store" });
-          const j = await r.json();
-          const url = j?.results?.[0]?.urls?.regular;
-          if (url) {
-            if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
-            return url;
+          const wikiURL = new URL("https://en.wikipedia.org/w/api.php");
+          wikiURL.searchParams.set("action", "query");
+          wikiURL.searchParams.set("format", "json");
+          wikiURL.searchParams.set("origin", "*");
+          wikiURL.searchParams.set("prop", "pageimages");
+          wikiURL.searchParams.set("generator", "search");
+          wikiURL.searchParams.set("gsrsearch", q);
+          wikiURL.searchParams.set("gsrlimit", "1");
+          wikiURL.searchParams.set("piprop", "thumbnail");
+          wikiURL.searchParams.set("pithumbsize", "1000");
+
+          const wr = await fetch(wikiURL.toString(), { cache: "no-store" });
+          const wj = await wr.json();
+          const pages = wj?.query?.pages ? Object.values(wj.query.pages as any) : [];
+          let wikiThumb: string | undefined = pages?.[0]?.thumbnail?.source;
+          if (wikiThumb) wikiThumb = wikiThumb.replace(/^\/\//, "https://");
+          if (wikiThumb) {
+            if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
+            return wikiThumb;
           }
         } catch {}
+
+        if (UNSPLASH_KEY) {
+          try {
+            const u = new URL("https://api.unsplash.com/search/photos");
+            u.searchParams.set("query", q);
+            u.searchParams.set("client_id", UNSPLASH_KEY);
+            u.searchParams.set("per_page", "1");
+            const r = await fetch(u.toString(), { cache: "no-store" });
+            const j = await r.json();
+            const url = j?.results?.[0]?.urls?.regular;
+            if (url) {
+              if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
+              return url;
+            }
+          } catch {}
+        }
       }
 
       if (typeof window !== "undefined") localStorage.setItem(cacheKey, "/fallback.jpg");
       return "/fallback.jpg";
+    } catch {
+      return "/fallback.jpg";
+    }
+  };
+
+  const fetchWikidataImageByCoords = async (lat: number, lon: number): Promise<string | null> => {
+    try {
+      const url = new URL("https://nominatim.openstreetmap.org/reverse");
+      url.searchParams.set("format", "jsonv2");
+      url.searchParams.set("lat", String(lat));
+      url.searchParams.set("lon", String(lon));
+      url.searchParams.set("zoom", "16");
+      url.searchParams.set("extratags", "1");
+
+      const r = await fetch(url.toString(), {
+        headers: {
+          "Accept-Language": "en",
+          "User-Agent": "CrowdPlaces/1.0 (contact@example.com)", 
+        },
+        cache: "no-store",
+      });
+      const j = await r.json();
+      const qid: string | undefined = j?.extratags?.wikidata; 
+      if (!qid) return null;
+
+      const wd = await fetch(
+        `https://www.wikidata.org/wiki/Special:EntityData/${encodeURIComponent(qid)}.json`,
+        { cache: "no-store" }
+      ).then((res) => res.json());
+
+      const entity = wd?.entities?.[qid];
+      const p18 = entity?.claims?.P18?.[0]?.mainsnak?.datavalue?.value as string | undefined;
+      if (!p18) return null;
+
+      const commonsUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(
+        p18
+      )}?width=1200`;
+
+      return commonsUrl;
+    } catch {
+      return null;
+    }
+  };
+
+  const fetchWikipediaGeoImage = async (lat: number, lon: number): Promise<{ url: string; title?: string } | null> => {
+    try {
+      const api = new URL("https://en.wikipedia.org/w/api.php");
+      api.searchParams.set("action", "query");
+      api.searchParams.set("format", "json");
+      api.searchParams.set("origin", "*");
+      api.searchParams.set("prop", "pageimages|coordinates");
+      api.searchParams.set("generator", "geosearch");
+      api.searchParams.set("ggscoord", `${lat}|${lon}`);
+      api.searchParams.set("ggsradius", "10000"); // 10km
+      api.searchParams.set("ggslimit", "10");
+      api.searchParams.set("pithumbsize", "1200");
+
+      const resp = await fetch(api.toString(), { cache: "no-store" });
+      const data = await resp.json();
+      const pages = data?.query?.pages ? Object.values(data.query.pages as any) : [];
+
+      const withThumb = pages.filter((p: any) => p?.thumbnail?.source);
+      const pick = (withThumb[0] || pages[0]) as any;
+      if (!pick) return null;
+
+      let url = pick?.thumbnail?.source as string | undefined;
+      if (url) url = url.replace(/^\/\//, "https://");
+      if (url) return { url, title: pick.title as string };
+
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const fetchImageByCoordsFirst = async (
+    lat: number,
+    lon: number,
+    detectedName: string,
+    addr: any
+  ): Promise<string> => {
+    const cacheKey = `img-geo-${lat.toFixed(4)},${lon.toFixed(4)}`;
+    try {
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) return cached;
+      }
+
+      const wdImg = await fetchWikidataImageByCoords(lat, lon);
+      if (wdImg) {
+        if (typeof window !== "undefined") localStorage.setItem(cacheKey, wdImg);
+        return wdImg;
+      }
+
+      const geoImg = await fetchWikipediaGeoImage(lat, lon);
+      if (geoImg?.url) {
+        if (typeof window !== "undefined") localStorage.setItem(cacheKey, geoImg.url);
+        return geoImg.url;
+      }
+
+      const candidates = buildDetectedImageQueries(detectedName, addr);
+      const named = await fetchPlaceImageByName(candidates);
+      if (typeof window !== "undefined") localStorage.setItem(cacheKey, named);
+      return named;
     } catch {
       return "/fallback.jpg";
     }
@@ -105,10 +245,12 @@ export default function HomePage() {
           url.searchParams.set("format", "jsonv2");
           url.searchParams.set("lat", String(latitude));
           url.searchParams.set("lon", String(longitude));
+          url.searchParams.set("extratags", "1");
+
           const r = await fetch(url.toString(), {
             headers: {
               "Accept-Language": "en",
-              "User-Agent": "YourAppName/1.0 (contact@example.com)",
+              "User-Agent": "CrowdPlaces/1.0 (contact@example.com)", 
             },
             cache: "no-store",
           });
@@ -124,7 +266,7 @@ export default function HomePage() {
             addr.county ||
             "Nearby City";
 
-          const img = await fetchPlaceImage(cityName);
+          const img = await fetchImageByCoordsFirst(latitude, longitude, cityName, addr);
 
           setDetectedCity({
             name: cityName,
@@ -165,7 +307,7 @@ export default function HomePage() {
 
         const withImages = await Promise.all(
           data.map(async (p) => {
-            const image = await fetchPlaceImage(p.name);
+            const image = await fetchPlaceImageByName([p.name, "Colombo"]);
             return { ...p, image };
           })
         );
@@ -194,7 +336,12 @@ export default function HomePage() {
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
           searchQuery
         )}+Sri+Lanka`,
-        { headers: { "Accept-Language": "en" } }
+        {
+          headers: {
+            "Accept-Language": "en",
+            "User-Agent": "CrowdPlaces/1.0 (contact@example.com)",
+          },
+        }
       );
       const geoData = await geoRes.json();
       if (!geoData[0]) {
@@ -224,7 +371,7 @@ export default function HomePage() {
           .filter((el: any) => el.tags?.name)
           .map(async (el: any, idx: number) => {
             const name: string = el.tags.name;
-            const image = await fetchPlaceImage(name);
+            const image = await fetchPlaceImageByName([name, searchQuery]);
             return {
               id: String(el.id ?? idx),
               name,
@@ -258,11 +405,12 @@ export default function HomePage() {
     router.push(url);
   };
 
+  const showDetectedCard = useMemo(() => !!detectedCity && !detectingCity, [detectedCity, detectingCity]);
+
   return (
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
       <h1 className="text-xl font-bold text-[#16a085] mb-3">Discover Places</h1>
 
-      {/* Search */}
       <div className="flex mb-4 gap-2">
         <input
           type="text"
@@ -275,13 +423,16 @@ export default function HomePage() {
           onClick={handleSearch}
           className="bg-[#16a085] text-white px-4 rounded-lg hover:bg-[#13856d]"
           disabled={loading}
+          aria-busy={loading}
         >
           {loading ? "Searching..." : "Search"}
         </button>
       </div>
 
       {error && <p className="text-red-600 mb-3">{error}</p>}
-      {loading && <p className="text-gray-500 mb-2">Loading popular places...</p>}
+      {loading && !searchResults.length && !places.length && (
+        <p className="text-gray-500 mb-2">Loading popular places...</p>
+      )}
 
       {searchResults.length > 0 && (
         <div className="mb-6">
@@ -314,7 +465,7 @@ export default function HomePage() {
       <h2 className="text-lg font-semibold text-gray-700 mb-2">Suggestions</h2>
 
       <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
-        {detectedCity && (
+        {showDetectedCard && detectedCity && (
           <div
             key="detected-city"
             onClick={() => setShowDetectedModal(true)}
@@ -336,9 +487,7 @@ export default function HomePage() {
                   Detected
                 </span>
               </div>
-              <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                Click to choose a busy level…
-              </p>
+              <p className="text-xs text-gray-600 mt-1 line-clamp-2">Click to choose a busy level…</p>
             </div>
           </div>
         )}

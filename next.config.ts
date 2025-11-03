@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "dynamic-media-cdn.tripadvisor.com" },
       { protocol: "https", hostname: "www.sundayobserver.lk" },
       { protocol: "https", hostname: "upload.wikimedia.org" },
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "source.unsplash.com" },
     ],
     domains: [
       "upload.wikimedia.org",
