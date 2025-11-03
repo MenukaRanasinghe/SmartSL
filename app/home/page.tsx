@@ -34,7 +34,7 @@ export default function HomePage() {
         setLoading(true);
         setError(null);
 
-        const res = await fetch("/api/places", { cache: "no-store" });
+        const res = await fetch("/api/crowd", { cache: "no-store" });
         if (!res.ok) throw new Error(`API returned status ${res.status}`);
         const data: Place[] = await res.json();
 
