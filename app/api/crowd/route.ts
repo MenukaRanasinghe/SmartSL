@@ -5,10 +5,10 @@ import fs from "fs";
 
 type Row = {
   place?: string;
-  hour?: number | string;
+  hour?: number | string;   
   date?: number;            
-  district?: string;        
-  busyness_level?: number | string;
+  district?: string;
+  busyness_level?: number | string; 
 };
 
 const placeCoordinates: Record<string, { lat: number; lon: number }> = {
@@ -17,7 +17,6 @@ const placeCoordinates: Record<string, { lat: number; lon: number }> = {
   "Diyatha Uyana": { lat: 6.9069, lon: 79.9099 },
   "Viharamahadevi Park": { lat: 6.914, lon: 79.861 },
   "Lotus Tower": { lat: 6.9272, lon: 79.8487 },
-
 };
 
 const levelMap: Record<number, string> = {
@@ -27,32 +26,114 @@ const levelMap: Record<number, string> = {
   4: "Very Busy",
 };
 
-export async function GET() {
+const scoreFromLevel = (lvl: number | string | undefined) => {
+  const n = Number(lvl);
+  if (![1,2,3,4].includes(n)) return 3; 
+  return n;
+};
+
+const excelEpoch = new Date(1899, 11, 30);
+const dateSerialToISO = (serial?: number) => {
+  if (serial === undefined || serial === null) return null;
+  const d = new Date(excelEpoch.getTime() + serial * 86400000);
+  return d.toISOString().split("T")[0];
+};
+
+const serialAndHourToDate = (serial?: number, hour?: number | string) => {
+  if (serial === undefined || hour === undefined || hour === null) return null;
+  const base = new Date(excelEpoch.getTime() + serial * 86400000);
+  const h = Number(hour);
+  const d = new Date(base);
+  d.setHours(h, 0, 0, 0);
+  return d;
+};
+
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const placeQuery = searchParams.get("place");           
+    const limit = Math.max(1, Math.min(48, Number(searchParams.get("limit") || "12")));
+
     const dataPath = path.resolve(process.cwd(), "data", "crowd_predictions_next7days_with_levels.xlsx");
     if (!fs.existsSync(dataPath)) {
       console.warn("Excel not found at:", dataPath);
-      return NextResponse.json([], { status: 200 });
+      return NextResponse.json(placeQuery ? { place: placeQuery, forecast: [], best: null } : [], { status: 200 });
     }
 
     const workbook = XLSX.read(fs.readFileSync(dataPath), { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows: Row[] = XLSX.utils.sheet_to_json(sheet);
 
-    if (!rows.length) return NextResponse.json([], { status: 200 });
+    if (!rows.length) {
+      return NextResponse.json(placeQuery ? { place: placeQuery, forecast: [], best: null } : [], { status: 200 });
+    }
+
+    if (placeQuery) {
+      const canonicalName = Object.keys(placeCoordinates).find(
+        (p) => p.toLowerCase() === placeQuery.toLowerCase()
+      ) || placeQuery;
+
+      const rowsForPlace = rows.filter(r =>
+        (r.place || "").toString().trim().toLowerCase() === canonicalName.toLowerCase()
+      );
+
+      const withDate = rowsForPlace
+        .map(r => {
+          const dt = serialAndHourToDate(r.date, r.hour);
+          return dt ? { ...r, when: dt } : null;
+        })
+        .filter(Boolean) as (Row & { when: Date })[];
+
+      const now = new Date();
+      const future = withDate
+        .filter(r => r.when.getTime() >= now.getTime())
+        .sort((a, b) => a.when.getTime() - b.when.getTime());
+
+      const take = future.slice(0, limit);
+      const need = limit - take.length;
+      let extra: (Row & { when: Date })[] = [];
+      if (need > 0) {
+        extra = withDate
+          .filter(r => !take.includes(r))
+          .sort((a, b) => a.when.getTime() - b.when.getTime())
+          .slice(0, need);
+      }
+
+      const picked = [...take, ...extra];
+
+      const forecast = picked.map(item => {
+        const lvlNum = Number(item.busyness_level);
+        const lvl = levelMap[lvlNum] || "Moderate";
+        return {
+          iso: item.when.toISOString(),
+          hour: item.when.getHours(),
+          level: lvl,
+          score: scoreFromLevel(item.busyness_level),
+          date: dateSerialToISO(item.date),
+        };
+      });
+
+      let best = null as null | (typeof forecast[number]);
+      if (forecast.length) {
+        const minScore = Math.min(...forecast.map(f => f.score));
+        best = forecast.find(f => f.score === minScore) || null;
+      }
+
+      const coords = placeCoordinates[canonicalName];
+
+      return NextResponse.json({
+        place: canonicalName,
+        coords: coords || null,
+        forecast,
+        best
+      }, { status: 200 });
+    }
 
     const now = new Date();
     const todayISO = now.toISOString().split("T")[0];
     const currentHour = now.getHours();
 
-    const excelEpoch = new Date(1899, 11, 30);
-    const toISO = (excelSerial?: number) => {
-      if (!excelSerial && excelSerial !== 0) return null;
-      const d = new Date(excelEpoch.getTime() + excelSerial * 86400000);
-      return d.toISOString().split("T")[0];
-    };
-
-    const todayRows = rows.filter(r => toISO(r.date) === todayISO);
+    const todayRows = rows.filter(r => dateSerialToISO(r.date) === todayISO);
     let pool = todayRows.length ? todayRows : rows;
 
     const numericHour = (h: number | string | undefined) => (h === undefined ? NaN : Number(h));
