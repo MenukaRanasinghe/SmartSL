@@ -24,9 +24,62 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
-  const GOOGLE_CX = process.env.NEXT_PUBLIC_GOOGLE_CX_ID;
   const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
+
+  const fetchPlaceImage = async (name: string): Promise<string> => {
+    const cacheKey = `img-${name}`;
+    try {
+      if (typeof window !== "undefined") {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) return cached;
+      }
+
+      try {
+        const q = `${name} Sri Lanka`;
+        const wikiURL = new URL("https://en.wikipedia.org/w/api.php");
+        wikiURL.searchParams.set("action", "query");
+        wikiURL.searchParams.set("format", "json");
+        wikiURL.searchParams.set("origin", "*");
+        wikiURL.searchParams.set("prop", "pageimages");
+        wikiURL.searchParams.set("generator", "search");
+        wikiURL.searchParams.set("gsrsearch", q);
+        wikiURL.searchParams.set("gsrlimit", "1");
+        wikiURL.searchParams.set("piprop", "thumbnail");
+        wikiURL.searchParams.set("pithumbsize", "1000");
+
+        const wr = await fetch(wikiURL.toString(), { cache: "no-store" });
+        const wj = await wr.json();
+        const pages = wj?.query?.pages ? Object.values(wj.query.pages as any) : [];
+        const wikiThumb: string | undefined = pages?.[0]?.thumbnail?.source;
+
+        if (wikiThumb) {
+          if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
+          return wikiThumb;
+        }
+      } catch {/* ignore and fall back */}
+
+      if (UNSPLASH_KEY) {
+        try {
+          const u = new URL("https://api.unsplash.com/search/photos");
+          u.searchParams.set("query", `${name} Sri Lanka`);
+          u.searchParams.set("client_id", UNSPLASH_KEY);
+          u.searchParams.set("per_page", "1");
+          const r = await fetch(u.toString(), { cache: "no-store" });
+          const j = await r.json();
+          const url = j?.results?.[0]?.urls?.regular;
+          if (url) {
+            if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
+            return url;
+          }
+        } catch {/* ignore */}
+      }
+
+      if (typeof window !== "undefined") localStorage.setItem(cacheKey, "/fallback.jpg");
+      return "/fallback.jpg";
+    } catch {
+      return "/fallback.jpg";
+    }
+  };
 
   useEffect(() => {
     const fetchColomboPlaces = async () => {
@@ -46,31 +99,8 @@ export default function HomePage() {
 
         const withImages = await Promise.all(
           data.map(async (p) => {
-            const cacheKey = `img-${p.name}`;
-            let image =
-              typeof window !== "undefined"
-                ? localStorage.getItem(cacheKey) || undefined
-                : undefined;
-
-            if (!image && UNSPLASH_KEY) {
-              try {
-                const u = new URL("https://api.unsplash.com/search/photos");
-                u.searchParams.set("query", `${p.name} Sri Lanka`);
-                u.searchParams.set("client_id", UNSPLASH_KEY);
-                u.searchParams.set("per_page", "1");
-                const r = await fetch(u.toString());
-                const j = await r.json();
-                image = j?.results?.[0]?.urls?.regular || "/fallback.jpg";
-                if (typeof window !== "undefined") localStorage.setItem(cacheKey, image);
-              } catch {
-                image = "/fallback.jpg";
-              }
-            }
-
-            return {
-              ...p,
-              image: image || "/fallback.jpg",
-            };
+            const image = await fetchPlaceImage(p.name);
+            return { ...p, image };
           })
         );
 
@@ -128,41 +158,7 @@ export default function HomePage() {
           .filter((el: any) => el.tags?.name)
           .map(async (el: any, idx: number) => {
             const name: string = el.tags.name;
-            let image: string | undefined;
-
-            const cacheKey = `image-${name}`;
-            if (typeof window !== "undefined")
-              image = localStorage.getItem(cacheKey) || undefined;
-
-            if (!image && GOOGLE_KEY && GOOGLE_CX) {
-              try {
-                const g = new URL("https://www.googleapis.com/customsearch/v1");
-                g.searchParams.set("q", `${name} Sri Lanka`);
-                g.searchParams.set("cx", GOOGLE_CX);
-                g.searchParams.set("searchType", "image");
-                g.searchParams.set("num", "1");
-                g.searchParams.set("key", GOOGLE_KEY);
-                const r = await fetch(g.toString());
-                const j = await r.json();
-                image = j?.items?.[0]?.link;
-              } catch {}
-            }
-
-            if (!image && UNSPLASH_KEY) {
-              try {
-                const u = new URL("https://api.unsplash.com/search/photos");
-                u.searchParams.set("query", `${name} Sri Lanka`);
-                u.searchParams.set("client_id", UNSPLASH_KEY);
-                u.searchParams.set("per_page", "1");
-                const r = await fetch(u.toString());
-                const j = await r.json();
-                image = j?.results?.[0]?.urls?.regular;
-              } catch {}
-            }
-
-            if (!image) image = "/fallback.jpg";
-            if (typeof window !== "undefined") localStorage.setItem(cacheKey, image);
-
+            const image = await fetchPlaceImage(name);
             return {
               id: String(el.id ?? idx),
               name,
