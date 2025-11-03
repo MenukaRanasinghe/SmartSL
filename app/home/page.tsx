@@ -19,7 +19,7 @@ export default function HomePage() {
   const [places, setPlaces] = useState<Place[]>([]);
   const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
   const GOOGLE_CX = process.env.NEXT_PUBLIC_GOOGLE_CX_ID;
-  const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY; 
+  const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
 
   useEffect(() => {
     const detectAndLoad = async () => {
@@ -137,28 +137,26 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
-      <h1 className="text-xl font-bold text-[#16a085] mb-2">
-        Suggestions
-      </h1>
+      <h1 className="text-xl font-bold text-[#16a085] mb-3">Suggestions</h1>
 
       {places.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
           {places.map((place) => (
             <div
               key={place.id}
               onClick={() =>
                 router.push(`/place/${place.id}?lat=${place.lat}&lon=${place.lon}`)
               }
-              className="bg-white rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
+              className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
             >
-              <div className="aspect-[16/9] w-full overflow-hidden">
+              <div className="w-full h-36 overflow-hidden">
                 {place.image ? (
                   <Image
                     src={place.image}
                     alt={place.name}
-                    width={800}
-                    height={450}
-                    className="w-full h-auto object-cover transition-transform duration-300 hover:scale-105"
+                    width={240}
+                    height={144}
+                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                   />
                 ) : (
                   <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500">
@@ -166,9 +164,9 @@ export default function HomePage() {
                   </div>
                 )}
               </div>
-              <div className="p-4">
-                <h3 className="font-bold text-lg text-gray-900">{place.name}</h3>
-                <p className="text-sm text-gray-600 mt-1">
+              <div className="p-3">
+                <h3 className="font-bold text-md text-gray-900 truncate">{place.name}</h3>
+                <p className="text-xs text-gray-600 mt-1 line-clamp-2">
                   {place.description || "A beautiful place to visit near you."}
                 </p>
               </div>
@@ -180,6 +178,16 @@ export default function HomePage() {
           Detecting nearby places to visit...
         </p>
       )}
+
+      <style jsx>{`
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 }
