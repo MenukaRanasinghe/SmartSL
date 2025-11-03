@@ -1,6 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import "leaflet/dist/leaflet.css";
+
 
 import "./globals.css";
 import Navbar from "@/src/components/Navbar";

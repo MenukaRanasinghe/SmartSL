@@ -1,135 +1,125 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { GoogleMap, useLoadScript, OverlayView } from "@react-google-maps/api";
+import { GoogleMap, Marker, InfoWindow, useLoadScript } from "@react-google-maps/api";
+
+type BusyLevel = "Quiet" | "Moderate" | "Busy" | "Very Busy";
 
 interface Place {
   id: string;
   name: string;
   lat: number;
   lon: number;
-  busyLevel: "Busy" | "Moderate" | "Quiet";
+  busyLevel: BusyLevel;
 }
 
-const containerStyle = {
-  width: "100%",
-  height: "70vh",
+const containerStyle = { width: "100%", height: "70vh" };
+
+const textColors: Record<BusyLevel, string> = {
+  Quiet: "#16a34a",       
+  Moderate: "#eab308",    
+  Busy: "#f97316",        
+  "Very Busy": "#dc2626", 
 };
 
-const baseIconUrl = "https://img.icons8.com/?size=100&id=86816&format=png&color=000000";
-
-const textColors = {
-  Busy: "red",
-  Moderate: "orange",
-  Quiet: "blue",
-};
-
-const iconFilters = {
-  Busy: "invert(21%) sepia(97%) saturate(7485%) hue-rotate(358deg) brightness(90%) contrast(90%)",
-  Moderate: "invert(89%) sepia(7%) saturate(7443%) hue-rotate(357deg) brightness(100%) contrast(100%)",
-  Quiet: "invert(33%) sepia(78%) saturate(3355%) hue-rotate(200deg) brightness(95%) contrast(90%)",
+const pinIcons: Record<BusyLevel, string> = {
+  Quiet: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
+  Moderate: "https://maps.google.com/mapfiles/ms/icons/yellow-dot.png",
+  Busy: "https://maps.google.com/mapfiles/ms/icons/orange-dot.png",
+  "Very Busy": "https://maps.google.com/mapfiles/ms/icons/red-dot.png",
 };
 
 export default function ExplorePage() {
-  const [userLocation, setUserLocation] = useState({ lat: 7.8731, lng: 80.7718 });
   const [places, setPlaces] = useState<Place[]>([]);
+  const [selected, setSelected] = useState<Place | null>(null);
 
-  const { isLoaded } = useLoadScript({
+  const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || "",
+    libraries: ["places"],
   });
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      });
-    }
+    if (!isLoaded) return;
 
-    setPlaces([
-      { id: "1", name: "Colombo City", lat: 6.9271, lon: 79.8612, busyLevel: "Busy" },
-      { id: "2", name: "Galle Fort", lat: 6.0326, lon: 80.2160, busyLevel: "Moderate" },
-      { id: "3", name: "Sigiriya", lat: 7.9576, lon: 80.7603, busyLevel: "Quiet" },
-      { id: "4", name: "Nuwara Eliya", lat: 6.9497, lon: 80.7890, busyLevel: "Moderate" },
-    ]);
-  }, []);
+    const fetchPlaces = async () => {
+      try {
+        const res = await fetch("/api/places");
+        const data: Place[] = await res.json();
+        setPlaces(data.filter((p) => p.lat && p.lon));
+      } catch (err) {
+        console.error("❌ Error fetching places:", err);
+      }
+    };
 
-  if (!isLoaded) return <div className="text-center p-10">Loading Map...</div>;
+    fetchPlaces();
+  }, [isLoaded]);
+
+  if (loadError) return <div>❌ Map failed to load</div>;
+  if (!isLoaded) return <div>Loading map...</div>;
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 pb-32">
-      <h1 className="text-xl font-bold text-[#16a085] mb-4 text-center mt-4">Explore Map</h1>
+      <h1 className="text-2xl font-bold text-[#222222] mb-4 text-center mt-6">
+        Live Availability
+      </h1>
 
       <div className="mx-4 rounded-2xl overflow-hidden shadow-md">
-        <GoogleMap mapContainerStyle={containerStyle} center={userLocation} zoom={7}>
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          center={{ lat: 7.8731, lng: 80.7718 }}
+          zoom={8}
+        >
           {places.map((place) => (
-            <OverlayView
+            <Marker
               key={place.id}
               position={{ lat: place.lat, lng: place.lon }}
-              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-              getPixelPositionOffset={(width, height) => ({
-                x: -width / 2,
-                y: -height / 2,
-              })}
-            >
-              <div className="flex flex-col items-center">
-                <span
-                  style={{
-                    color: textColors[place.busyLevel],
-                    fontWeight: "bold",
-                    fontSize: "12px",
-                  }}
-                >
-                  {place.busyLevel}
-                </span>
-                <img
-                  src={baseIconUrl}
-                  alt={place.name}
-                  style={{
-                    width: 28,
-                    height: 28,
-                    filter: iconFilters[place.busyLevel],
-                  }}
-                />
-              </div>
-            </OverlayView>
+              title={`${place.name}: ${place.busyLevel}`}
+              icon={{
+                url: pinIcons[place.busyLevel],
+                scaledSize: new google.maps.Size(34, 34),
+              }}
+              onClick={() => setSelected(place)}
+            />
           ))}
+
+          {selected && (
+            <InfoWindow
+              position={{ lat: selected.lat, lng: selected.lon }}
+              onCloseClick={() => setSelected(null)}
+            >
+              <div className="text-sm">
+                <h3 className="font-bold text-[#16a085]">{selected.name}</h3>
+                <p style={{ color: textColors[selected.busyLevel], fontWeight: "bold" }}>
+                  Crowd Level: {selected.busyLevel}
+                </p>
+              </div>
+            </InfoWindow>
+          )}
         </GoogleMap>
       </div>
 
-      <div className="flex justify-center mt-4 space-x-6">
-        {(["Busy", "Moderate", "Quiet"] as const).map((level) => (
-          <div key={level} className="flex items-center space-x-2">
-            <img
-              src={baseIconUrl}
-              alt={level}
-              style={{ width: 20, height: 20, filter: iconFilters[level] }}
-            />
-            <span
-              style={{
-                color: textColors[level],
-                fontWeight: "bold",
-                fontSize: "14px",
-              }}
-            >
-              {level}
-            </span>
+      <div className="mt-5 mx-6 bg-white rounded-xl shadow-md p-4">
+        <h2 className="text-md font-semibold text-gray-900 mb-3">
+          Crowd Level Legend
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm text-gray-800">
+          <div className="flex items-center space-x-2">
+            <span className="w-4 h-4 bg-green-500 rounded-full"></span>
+            <span>Quiet</span>
           </div>
-        ))}
-      </div>
-
-      <div className="bg-white border-t border-gray-200 flex justify-around p-3 fixed bottom-0 w-full">
-        <a href="/home" className="flex flex-col items-center text-gray-600 hover:text-[#16a085]">
-          <span>🏠</span>
-          <span className="text-xs">Home</span>
-        </a>
-        <a href="/explore" className="flex flex-col items-center text-[#16a085] font-semibold">
-          <span>🗺️</span>
-          <span className="text-xs">Explore</span>
-        </a>
-        <a href="/profile" className="flex flex-col items-center text-gray-600 hover:text-[#16a085]">
-          <span>👤</span>
-          <span className="text-xs">Profile</span>
-        </a>
+          <div className="flex items-center space-x-2">
+            <span className="w-4 h-4 bg-yellow-400 rounded-full"></span>
+            <span>Moderate</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="w-4 h-4 bg-orange-500 rounded-full"></span>
+            <span>Busy</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="w-4 h-4 bg-red-600 rounded-full"></span>
+            <span>Very Busy</span>
+          </div>
+        </div>
       </div>
     </div>
   );
