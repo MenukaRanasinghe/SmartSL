@@ -1,11 +1,12 @@
 'use client'
 
+import axios from 'axios'
 import { useState } from 'react'
 
 type Prediction = {
   placeId: string
   placeName: string
-  predictedLevels: number[] // e.g. future hourly crowd scores
+  predictedLevels: number[] 
   alternatives: { placeId: string; name: string; score: number }[]
 }
 
@@ -20,9 +21,7 @@ export default function SuggestionsPage() {
     setError('')
     setPred(null)
     try {
-      // Adjust URL to your ML backend endpoint
       const res = await axios.get('/api/predict', { params: { placeId } })
-      // expected res.data = { placeId, placeName, predictedLevels, alternatives }
       setPred(res.data)
     } catch (e: any) {
       setError(e?.response?.data?.message ?? e.message ?? 'Request failed')

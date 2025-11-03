@@ -1,0 +1,31 @@
+mutation AddUserFeedback($locationId: UUID!, $crowdLevel: Int!, $feedbackTime: Timestamp!, $notes: String) @auth(level: USER) {
+  userFeedback_insert(data: {locationId: $locationId, userId_expr: "auth.uid", crowdLevel: $crowdLevel, feedbackTime: $feedbackTime, notes: $notes})
+}
+
+query GetUserFavoriteLocations @auth(level: USER) {
+  favoriteLocations(where: {userId_expr: "auth.uid"}) {
+    location {
+      id
+      name
+      address
+      latitude
+      longitude
+    }
+  }
+}
+
+mutation AddFavoriteLocation($locationId: UUID!) @auth(level: USER) {
+  favoriteLocation_insert(data: {userId_expr: "auth.uid", locationId: $locationId, createdAt_expr: "request.time"})
+}
+
+query ListLocations @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  locations {
+    id
+    name
+    address
+    latitude
+    longitude
+    category
+    description
+  }
+}

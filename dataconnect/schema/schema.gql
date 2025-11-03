@@ -1,0 +1,49 @@
+type User @table {
+  displayName: String!
+  createdAt: Timestamp!
+  email: String
+  photoUrl: String
+}
+
+type Location @table {
+  name: String!
+  address: String!
+  latitude: Float!
+  longitude: Float!
+  createdAt: Timestamp!
+  description: String
+  category: String
+}
+
+type CrowdPrediction @table {
+  location: Location!
+  predictionTime: Timestamp!
+  predictedLevel: Int!
+  predictionDate: Date!
+  source: String
+}
+
+type UserFeedback @table {
+  user: User!
+  location: Location!
+  feedbackTime: Timestamp!
+  crowdLevel: Int!
+  createdAt: Timestamp!
+  notes: String
+}
+
+type FavoriteLocation @table(key: ["user", "location"]) {
+  user: User!
+  location: Location!
+  createdAt: Timestamp!
+}
+
+type Alert @table {
+  user: User!
+  location: Location!
+  thresholdLevel: Int!
+  createdAt: Timestamp!
+  active: Boolean!
+  notificationMethod: String
+  lastTriggeredAt: Timestamp
+}

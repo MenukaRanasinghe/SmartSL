@@ -21,7 +21,7 @@ export default function LandingPage() {
           Predict crowd levels in real time using Google Maps and Machine Learning
         </p>
         <button
-          onClick={() => router.push("/home")}
+          onClick={() => router.push("/login")}
           className="px-8 py-3 bg-[#16a085] rounded-xl text-lg font-semibold shadow-lg transition hover:scale-105"
         >
           Get Started

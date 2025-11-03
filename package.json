@@ -9,6 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@genkit-ai/vertexai": "^1.22.0",
+    "axios": "^1.13.1",
+    "firebase": "^12.5.0",
+    "genkit": "^1.22.0",
     "lucide-react": "^0.552.0",
     "next": "16.0.1",
     "react": "19.2.0",

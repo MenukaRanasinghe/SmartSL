@@ -12,6 +12,7 @@ const nextConfig = {
       { protocol: "https", hostname: "upload.wikimedia.org" },
     ],
   },
+  output: "export",
 };
 
 export default nextConfig;

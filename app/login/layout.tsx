@@ -1,13 +1,12 @@
 "use client";
 
+import Navbar from "@/src/components/Navbar";
 import { usePathname } from "next/navigation";
 
-import "./globals.css";
-import Navbar from "@/src/components/Navbar";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const hideLayout = ["/login", "/register", "/"].includes(pathname);
+  const hideLayout = ["/login", "/register"].includes(pathname);
 
   return (
     <html lang="en">
