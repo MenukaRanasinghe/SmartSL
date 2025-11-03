@@ -202,7 +202,7 @@ export default function HomePage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Type city or place name..."
-          className="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#16a085]"
+          className="flex-1 p-2 border text-gray-500 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#16a085]"
         />
         <button
           onClick={handleSearch}
@@ -218,7 +218,7 @@ export default function HomePage() {
 
       {searchResults.length > 0 && (
         <div className="mb-6">
-          <h2 className="font-semibold text-gray-700 mb-2">Popular Places:</h2>
+          <h2 className="font-semibold text-gray-700 mb-2">Sugesstions near {location}</h2>
           <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
             {searchResults.map((place) => (
               <div
@@ -245,7 +245,7 @@ export default function HomePage() {
       )}
 
       <h2 className="text-lg font-semibold text-gray-700 mb-2">
-        Suggestions Near {location}
+        Suggestions 
       </h2>
       {places.length > 0 ? (
         <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
