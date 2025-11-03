@@ -263,7 +263,7 @@ export default function HomePage() {
       )}
 
       <h2 className="text-lg font-semibold text-gray-700 mb-2">
-        Suggestions Near You ({location})
+        Suggestions Near {location}
       </h2>
       {places.length > 0 ? (
         <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
