@@ -56,7 +56,7 @@ export default function HomePage() {
           if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
           return wikiThumb;
         }
-      } catch {/* ignore and fall back */}
+      } catch {}
 
       if (UNSPLASH_KEY) {
         try {
@@ -71,7 +71,7 @@ export default function HomePage() {
             if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
             return url;
           }
-        } catch {/* ignore */}
+        } catch {}
       }
 
       if (typeof window !== "undefined") localStorage.setItem(cacheKey, "/fallback.jpg");
@@ -180,6 +180,18 @@ export default function HomePage() {
     }
   };
 
+  const pushToDetails = (place: Place) => {
+    const url =
+      `/place/${place.id}` +
+      `?name=${encodeURIComponent(place.name)}` +
+      `&desc=${encodeURIComponent(place.description || "")}` +
+      `&lat=${place.lat}` +
+      `&lon=${place.lon}` +
+      `&image=${encodeURIComponent(place.image || "/fallback.jpg")}` +
+      `&busy=${encodeURIComponent(place.busyLevel || "")}`;
+    router.push(url);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
       <h1 className="text-xl font-bold text-[#16a085] mb-3">Discover Places</h1>
@@ -211,16 +223,7 @@ export default function HomePage() {
             {searchResults.map((place) => (
               <div
                 key={place.id}
-                onClick={() => {
-                  router.push(
-                    `/place/${place.id}` +
-                      `?name=${encodeURIComponent(place.name)}` +
-                      `&desc=${encodeURIComponent(place.description || "")}` +
-                      `&lat=${place.lat}` +
-                      `&lon=${place.lon}` +
-                      `&image=${encodeURIComponent(place.image || "/fallback.jpg")}`
-                  );
-                }}
+                onClick={() => pushToDetails(place)}
                 className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
               >
                 <div className="relative w-full h-36 overflow-hidden">
@@ -234,7 +237,6 @@ export default function HomePage() {
                 </div>
                 <div className="p-3">
                   <h3 className="font-bold text-md text-gray-900 truncate">{place.name}</h3>
-                  <p className="text-xs text-gray-600 mt-1 line-clamp-2"></p>
                 </div>
               </div>
             ))}
@@ -250,16 +252,7 @@ export default function HomePage() {
           {places.map((place) => (
             <div
               key={place.id}
-              onClick={() => {
-                router.push(
-                  `/place/${place.id}` +
-                    `?name=${encodeURIComponent(place.name)}` +
-                    `&desc=${encodeURIComponent(place.description || "")}` +
-                    `&lat=${place.lat}` +
-                    `&lon=${place.lon}` +
-                    `&image=${encodeURIComponent(place.image || "/fallback.jpg")}`
-                );
-              }}
+              onClick={() => pushToDetails(place)}
               className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
             >
               <div className="relative w-full h-36 overflow-hidden">
@@ -280,25 +273,17 @@ export default function HomePage() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-600 mt-1 line-clamp-2"></p>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-gray-500 mt-10 text-center">
-          Detecting nearby places to visit...
-        </p>
+        <p className="text-gray-500 mt-10 text-center">Detecting nearby places to visit...</p>
       )}
 
       <style jsx>{`
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .hide-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
   );
