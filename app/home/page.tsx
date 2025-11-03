@@ -4,19 +4,31 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+interface Place {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  image?: string;
+  description?: string;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const [location, setLocation] = useState("Detecting...");
-  const [places, setPlaces] = useState<any[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+  const GOOGLE_CX = process.env.NEXT_PUBLIC_GOOGLE_CX_ID;
+  const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY; 
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setLocation("Geolocation not supported");
-      return;
-    }
+    const detectAndLoad = async () => {
+      if (!navigator.geolocation) {
+        setLocation("Geolocation not supported");
+        return;
+      }
 
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
         const { latitude, longitude } = pos.coords;
 
         const res = await fetch(
@@ -24,7 +36,6 @@ export default function HomePage() {
         );
         const data = await res.json();
         const addr = data.address;
-
         const detectedDistrict =
           addr.district ||
           addr.county ||
@@ -32,169 +43,102 @@ export default function HomePage() {
           addr.state ||
           addr.city ||
           "Sri Lanka";
-
         setLocation(detectedDistrict);
-        const district = detectedDistrict.toLowerCase();
 
-        let nearby = [];
+        const overpassQuery = `
+          [out:json][timeout:25];
+          (
+            node["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:10000,${latitude},${longitude});
+            way["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:10000,${latitude},${longitude});
+            relation["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:10000,${latitude},${longitude});
+          );
+          out center tags;
+        `;
+        const overpassRes = await fetch("https://overpass-api.de/api/interpreter", {
+          method: "POST",
+          body: overpassQuery,
+        });
+        const overpassData = await overpassRes.json();
 
-        if (district.includes("colombo")) {
-          nearby = [
-            {
-              id: "galleface",
-              name: "Galle Face Green",
-              image:
-                "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/1a/4f/03/4e/galle-face-green.jpg",
-              description:
-                "Colombo’s iconic oceanfront park with sunsets and street food.",
-            },
-            {
-              id: "gangaramaya",
-              name: "Gangaramaya Temple",
-              image:
-                "https://www.lovesrilanka.org/wp-content/uploads/2020/05/Gangaramaya-Temple-3.jpg",
-              description:
-                "A famous temple showcasing a mix of modern architecture and ancient tradition.",
-            },
-            {
-              id: "lotus-tower",
-              name: "Lotus Tower",
-              image:
-                "https://www.sundayobserver.lk/sites/default/files/styles/large/public/news/2023/09/14/z_p01-The-Lotus-Tower.jpg",
-              description:
-                "Sri Lanka’s tallest structure offering panoramic city views.",
-            },
-          ];
-        } else if (district.includes("galle")) {
-          nearby = [
-            {
-              id: "gallefort",
-              name: "Galle Fort",
-              image:
-                "https://resources.travellocal.com/wp/uploads/2023/01/26120050/d2c54ee1-3c98-445d-b3c5-55eae274c55e-gallefort-galle-Srilanka-SS.jpeg-scaled.jpg",
-              description:
-                "A UNESCO World Heritage site filled with colonial charm and ocean views.",
-            },
-            {
-              id: "unawatuna",
-              name: "Unawatuna Beach",
-              image:
-                "https://www.saltinourhair.com/wp-content/uploads/2018/08/sri-lanka-unawatuna-beach.jpg",
-              description:
-                "Golden-sand beach perfect for swimming, diving, and beach cafés.",
-            },
-            {
-              id: "junglebeach",
-              name: "Jungle Beach",
-              image:
-                "https://www.saltinourhair.com/wp-content/uploads/2018/08/sri-lanka-jungle-beach-galle.jpg",
-              description: "Hidden cove ideal for snorkeling and relaxing.",
-            },
-          ];
-        } else if (district.includes("kandy")) {
-          nearby = [
-            {
-              id: "templeoftooth",
-              name: "Temple of the Tooth",
-              image:
-                "https://nexttravelsrilanka.com/wp-content/uploads/2020/07/Temple-of-the-Tooth-Relic.jpg",
-              description:
-                "Sacred Buddhist temple housing the relic of Lord Buddha’s tooth.",
-            },
-            {
-              id: "kandy-lake",
-              name: "Kandy Lake",
-              image:
-                "https://www.saltinourhair.com/wp-content/uploads/2018/08/sri-lanka-kandy-lake.jpg",
-              description:
-                "Peaceful lake at the city’s heart surrounded by scenic views.",
-            },
-            {
-              id: "peradeniya",
-              name: "Royal Botanical Gardens",
-              image:
-                "https://www.lovesrilanka.org/wp-content/uploads/2020/05/Royal-Botanical-Gardens-2.jpg",
-              description:
-                "Expansive gardens with orchids, palm avenues, and tropical flora.",
-            },
-          ];
-        } else if (district.includes("nuwara") || district.includes("eliya")) {
-          nearby = [
-            {
-              id: "gregorylake",
-              name: "Gregory Lake",
-              image:
-                "https://www.lovesrilanka.org/wp-content/uploads/2020/05/Lake-Gregory-2.jpg",
-              description:
-                "Beautiful lake surrounded by gardens, great for boat rides and photos.",
-            },
-            {
-              id: "hakgalabotanical",
-              name: "Hakgala Botanical Garden",
-              image:
-                "https://nexttravelsrilanka.com/wp-content/uploads/2021/03/Hakgala-Botanical-Garden.jpg",
-              description:
-                "Colorful garden with mountain views and rare floral species.",
-            },
-            {
-              id: "hortonplains",
-              name: "Horton Plains",
-              image:
-                "https://www.saltinourhair.com/wp-content/uploads/2018/08/sri-lanka-horton-plains-worlds-end.jpg",
-              description:
-                "National park famous for World’s End cliff and scenic trails.",
-            },
-          ];
-        } else if (district.includes("matara")) {
-          nearby = [
-            {
-              id: "mirissa",
-              name: "Mirissa Beach",
-              image:
-                "https://www.saltinourhair.com/wp-content/uploads/2018/08/sri-lanka-mirissa-beach-view.jpg",
-              description:
-                "Tropical beach town known for whale watching and palm-tree viewpoints.",
-            },
-            {
-              id: "polhena",
-              name: "Polhena Beach",
-              image:
-                "https://nexttravelsrilanka.com/wp-content/uploads/2021/07/Polhena-Beach-Matara.jpg",
-              description:
-                "Coral reef-protected beach ideal for snorkeling and swimming.",
-            },
-          ];
-        } else {
-          nearby = [
-            {
-              id: "sigiriya",
-              name: "Sigiriya Rock Fortress",
-              image:
-                "https://www.lovesrilanka.org/wp-content/uploads/2020/05/Sigiriya-2.jpg",
-              description:
-                "Ancient rock fortress with royal gardens and breathtaking views.",
-            },
-            {
-              id: "dambulla",
-              name: "Dambulla Cave Temple",
-              image:
-                "https://www.saltinourhair.com/wp-content/uploads/2018/08/sri-lanka-dambulla-cave-temple.jpg",
-              description:
-                "Historic cave temple complex with colorful frescoes and Buddha statues.",
-            },
-          ];
-        }
+        const loadedPlaces: Place[] = await Promise.all(
+          overpassData.elements
+            .filter((el: any) => el.tags?.name)
+            .map(async (el: any) => {
+              const name = el.tags.name;
+              let image: string | undefined;
 
-        setPlaces(nearby);
-      },
-      () => setLocation("Location unavailable")
-    );
-  }, []);
+              const cached = localStorage.getItem(`image-${name}`);
+              if (cached) {
+                return {
+                  id: el.id.toString(),
+                  name,
+                  lat: el.lat || el.center?.lat,
+                  lon: el.lon || el.center?.lon,
+                  image: cached,
+                  description: el.tags?.description || el.tags?.note || "",
+                };
+              }
+
+              try {
+                const googleRes = await fetch(
+                  `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(
+                    name + " Sri Lanka"
+                  )}&cx=${GOOGLE_CX}&searchType=image&num=1&key=${GOOGLE_KEY}`
+                );
+                const googleData = await googleRes.json();
+                image = googleData.items?.[0]?.link;
+              } catch (err) {
+                console.error("Google image fetch failed:", err);
+              }
+
+              if (!image) {
+                try {
+                  const wikiRes = await fetch(
+                    `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`
+                  );
+                  const wikiData = await wikiRes.json();
+                  image = wikiData?.originalimage?.source || wikiData?.thumbnail?.source;
+                } catch {}
+              }
+
+              if (!image && UNSPLASH_KEY) {
+                try {
+                  const unsplashRes = await fetch(
+                    `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
+                      name + " Sri Lanka"
+                    )}&client_id=${UNSPLASH_KEY}&per_page=1`
+                  );
+                  const unsplashData = await unsplashRes.json();
+                  image = unsplashData.results?.[0]?.urls?.regular;
+                } catch {}
+              }
+
+              if (!image) image = "/fallback.jpg";
+
+              localStorage.setItem(`image-${name}`, image);
+
+              return {
+                id: el.id.toString(),
+                name,
+                lat: el.lat || el.center?.lat,
+                lon: el.lon || el.center?.lon,
+                image,
+                description: el.tags?.description || el.tags?.note || "",
+              };
+            })
+        );
+
+        setPlaces(loadedPlaces);
+      });
+    };
+
+    detectAndLoad();
+  }, [GOOGLE_KEY, GOOGLE_CX, UNSPLASH_KEY]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
       <h1 className="text-xl font-bold text-[#16a085] mb-2">
-        Recommendations
+        Suggestions
       </h1>
 
       {places.length > 0 ? (
@@ -202,28 +146,38 @@ export default function HomePage() {
           {places.map((place) => (
             <div
               key={place.id}
-              onClick={() => router.push(`/place/${place.id}`)}
+              onClick={() =>
+                router.push(`/place/${place.id}?lat=${place.lat}&lon=${place.lon}`)
+              }
               className="bg-white rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
             >
               <div className="aspect-[16/9] w-full overflow-hidden">
-                <Image
-                  src={place.image}
-                  alt={place.name}
-                  width={800}
-                  height={450}
-                  className="w-full h-auto object-cover transition-transform duration-300 hover:scale-105"
-                />
+                {place.image ? (
+                  <Image
+                    src={place.image}
+                    alt={place.name}
+                    width={800}
+                    height={450}
+                    className="w-full h-auto object-cover transition-transform duration-300 hover:scale-105"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500">
+                    No image
+                  </div>
+                )}
               </div>
               <div className="p-4">
                 <h3 className="font-bold text-lg text-gray-900">{place.name}</h3>
-                <p className="text-sm text-gray-600 mt-1">{place.description}</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  {place.description || "A beautiful place to visit near you."}
+                </p>
               </div>
             </div>
           ))}
         </div>
       ) : (
         <p className="text-gray-500 mt-10 text-center">
-          Detecting nearby recommendations...
+          Detecting nearby places to visit...
         </p>
       )}
     </div>
