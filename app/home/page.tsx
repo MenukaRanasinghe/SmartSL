@@ -11,105 +11,77 @@ interface Place {
   lon: number;
   image?: string;
   description?: string;
+  busyLevel?: string;
 }
 
 export default function HomePage() {
   const router = useRouter();
-  const [location, setLocation] = useState("Detecting...");
+
+  const [location, setLocation] = useState("Colombo District");
   const [places, setPlaces] = useState<Place[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
   const GOOGLE_CX = process.env.NEXT_PUBLIC_GOOGLE_CX_ID;
   const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
 
   useEffect(() => {
-    const detectNearby = async () => {
-      if (!navigator.geolocation) return;
+    const fetchColomboPlaces = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        const { latitude, longitude } = pos.coords;
+        const res = await fetch("/api/places", { cache: "no-store" });
+        if (!res.ok) throw new Error(`API returned status ${res.status}`);
+        const data: Place[] = await res.json();
 
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
-        );
-        const data = await res.json();
-        const addr = data.address;
-        const detectedDistrict =
-          addr.district || addr.county || addr.state_district || addr.state || addr.city || "Sri Lanka";
-        setLocation(detectedDistrict);
+        if (!Array.isArray(data) || data.length === 0) {
+          setError("No Colombo district places found in Excel data.");
+          setPlaces([]);
+          return;
+        }
 
-        const overpassQuery = `
-          [out:json][timeout:25];
-          (
-            node["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:10000,${latitude},${longitude});
-            way["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:10000,${latitude},${longitude});
-            relation["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:10000,${latitude},${longitude});
-          );
-          out center tags;
-        `;
-        const overpassRes = await fetch("https://overpass-api.de/api/interpreter", {
-          method: "POST",
-          body: overpassQuery,
-        });
-        const overpassData = await overpassRes.json();
+        const withImages = await Promise.all(
+          data.map(async (p) => {
+            const cacheKey = `img-${p.name}`;
+            let image = typeof window !== "undefined" ? localStorage.getItem(cacheKey) || undefined : undefined;
 
-        const loadedPlaces: Place[] = await Promise.all(
-          overpassData.elements
-            .filter((el: any) => el.tags?.name)
-            .map(async (el: any, idx: number) => {
-              const name = el.tags.name;
-              let image: string | undefined;
-
-              const cached = localStorage.getItem(`image-${name}`);
-              if (cached) image = cached;
-
-              if (!image && GOOGLE_KEY && GOOGLE_CX) {
-                try {
-                  const googleRes = await fetch(
-                    `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(
-                      name + " Sri Lanka"
-                    )}&cx=${GOOGLE_CX}&searchType=image&num=1&key=${GOOGLE_KEY}`
-                  );
-                  const googleData = await googleRes.json();
-                  image = googleData.items?.[0]?.link;
-                } catch {}
+            if (!image && UNSPLASH_KEY) {
+              try {
+                const u = new URL("https://api.unsplash.com/search/photos");
+                u.searchParams.set("query", `${p.name} Sri Lanka`);
+                u.searchParams.set("client_id", UNSPLASH_KEY);
+                u.searchParams.set("per_page", "1");
+                const r = await fetch(u.toString());
+                const j = await r.json();
+                image = j?.results?.[0]?.urls?.regular || "/fallback.jpg";
+                if (typeof window !== "undefined") localStorage.setItem(cacheKey, image);
+              } catch {
+                image = "/fallback.jpg";
               }
+            }
 
-              if (!image && UNSPLASH_KEY) {
-                try {
-                  const unsplashRes = await fetch(
-                    `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
-                      name + " Sri Lanka"
-                    )}&client_id=${UNSPLASH_KEY}&per_page=1`
-                  );
-                  const unsplashData = await unsplashRes.json();
-                  image = unsplashData.results?.[0]?.urls?.regular;
-                } catch {}
-              }
-
-              if (!image) image = "/fallback.jpg";
-              localStorage.setItem(`image-${name}`, image);
-
-              return {
-                id: el.id?.toString() || idx.toString(),
-                name,
-                lat: el.lat || el.center?.lat,
-                lon: el.lon || el.center?.lon,
-                image,
-                description: el.tags?.description || el.tags?.note || "",
-              };
-            })
+            return {
+              ...p,
+              image: image || "/fallback.jpg",
+            };
+          })
         );
 
-        setPlaces(loadedPlaces);
-      });
+        setPlaces(withImages);
+      } catch (err: any) {
+        console.error("Error fetching Colombo places:", err);
+        setError("Failed to load Colombo attractions. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
     };
 
-    detectNearby();
-  }, [GOOGLE_KEY, GOOGLE_CX, UNSPLASH_KEY]);
+    fetchColomboPlaces();
+  }, [UNSPLASH_KEY]);
 
   const handleSearch = async () => {
     if (!searchQuery) {
@@ -120,14 +92,12 @@ export default function HomePage() {
     setLoading(true);
     try {
       const geoRes = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          searchQuery
-        )}+Sri+Lanka`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}+Sri+Lanka`,
+        { headers: { "Accept-Language": "en" } }
       );
       const geoData = await geoRes.json();
       if (!geoData[0]) {
         setSearchResults([]);
-        setLoading(false);
         return;
       }
       const { lat, lon } = geoData[0];
@@ -144,48 +114,51 @@ export default function HomePage() {
       const overpassRes = await fetch("https://overpass-api.de/api/interpreter", {
         method: "POST",
         body: overpassQuery,
+        headers: { "Content-Type": "text/plain" },
       });
       const overpassData = await overpassRes.json();
 
       const results: Place[] = await Promise.all(
-        overpassData.elements
+        (overpassData.elements || [])
           .filter((el: any) => el.tags?.name)
           .map(async (el: any, idx: number) => {
-            const name = el.tags.name;
+            const name: string = el.tags.name;
             let image: string | undefined;
 
-            const cached = localStorage.getItem(`image-${name}`);
-            if (cached) image = cached;
+            const cacheKey = `image-${name}`;
+            if (typeof window !== "undefined") image = localStorage.getItem(cacheKey) || undefined;
 
             if (!image && GOOGLE_KEY && GOOGLE_CX) {
               try {
-                const googleRes = await fetch(
-                  `https://www.googleapis.com/customsearch/v1?q=${encodeURIComponent(
-                    name + " Sri Lanka"
-                  )}&cx=${GOOGLE_CX}&searchType=image&num=1&key=${GOOGLE_KEY}`
-                );
-                const googleData = await googleRes.json();
-                image = googleData.items?.[0]?.link;
+                const g = new URL("https://www.googleapis.com/customsearch/v1");
+                g.searchParams.set("q", `${name} Sri Lanka`);
+                g.searchParams.set("cx", GOOGLE_CX);
+                g.searchParams.set("searchType", "image");
+                g.searchParams.set("num", "1");
+                g.searchParams.set("key", GOOGLE_KEY);
+                const r = await fetch(g.toString());
+                const j = await r.json();
+                image = j?.items?.[0]?.link;
               } catch {}
             }
 
             if (!image && UNSPLASH_KEY) {
               try {
-                const unsplashRes = await fetch(
-                  `https://api.unsplash.com/search/photos?query=${encodeURIComponent(
-                    name + " Sri Lanka"
-                  )}&client_id=${UNSPLASH_KEY}&per_page=1`
-                );
-                const unsplashData = await unsplashRes.json();
-                image = unsplashData.results?.[0]?.urls?.regular;
+                const u = new URL("https://api.unsplash.com/search/photos");
+                u.searchParams.set("query", `${name} Sri Lanka`);
+                u.searchParams.set("client_id", UNSPLASH_KEY);
+                u.searchParams.set("per_page", "1");
+                const r = await fetch(u.toString());
+                const j = await r.json();
+                image = j?.results?.[0]?.urls?.regular;
               } catch {}
             }
 
             if (!image) image = "/fallback.jpg";
-            localStorage.setItem(`image-${name}`, image);
+            if (typeof window !== "undefined") localStorage.setItem(cacheKey, image);
 
             return {
-              id: el.id?.toString() || idx.toString(),
+              id: String(el.id ?? idx),
               name,
               lat: el.lat || el.center?.lat,
               lon: el.lon || el.center?.lon,
@@ -196,6 +169,7 @@ export default function HomePage() {
       );
 
       setSearchResults(results);
+      setLocation(searchQuery);
     } catch (err) {
       console.error(err);
       setSearchResults([]);
@@ -219,12 +193,15 @@ export default function HomePage() {
         <button
           onClick={handleSearch}
           className="bg-[#16a085] text-white px-4 rounded-lg hover:bg-[#13856d]"
+          disabled={loading}
         >
-          Search
+          {loading ? "Searching..." : "Search"}
         </button>
       </div>
 
+      {error && <p className="text-red-600 mb-3">{error}</p>}
       {loading && <p className="text-gray-500 mb-2">Loading popular places...</p>}
+
       {searchResults.length > 0 && (
         <div className="mb-6">
           <h2 className="font-semibold text-gray-700 mb-2">Popular Places:</h2>
@@ -241,19 +218,18 @@ export default function HomePage() {
                 }
                 className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
               >
-                <div className="w-full h-36 overflow-hidden">
+                <div className="relative w-full h-36 overflow-hidden">
                   <Image
                     src={place.image || "/fallback.jpg"}
                     alt={place.name}
-                    width={240}
-                    height={144}
-                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                    fill
+                    sizes="240px"
+                    className="object-cover transition-transform duration-300 hover:scale-105"
                   />
                 </div>
                 <div className="p-3">
                   <h3 className="font-bold text-md text-gray-900 truncate">{place.name}</h3>
                   <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                    {place.description || "A beautiful place to visit."}
                   </p>
                 </div>
               </div>
@@ -262,9 +238,7 @@ export default function HomePage() {
         </div>
       )}
 
-      <h2 className="text-lg font-semibold text-gray-700 mb-2">
-        Suggestions Near {location}
-      </h2>
+      <h2 className="text-lg font-semibold text-gray-700 mb-2">Suggestions Near {location}</h2>
       {places.length > 0 ? (
         <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
           {places.map((place) => (
@@ -279,28 +253,32 @@ export default function HomePage() {
               }
               className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
             >
-              <div className="w-full h-36 overflow-hidden">
+              <div className="relative w-full h-36 overflow-hidden">
                 <Image
                   src={place.image || "/fallback.jpg"}
                   alt={place.name}
-                  width={240}
-                  height={144}
-                  className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                  fill
+                  sizes="240px"
+                  className="object-cover transition-transform duration-300 hover:scale-105"
                 />
               </div>
               <div className="p-3">
-                <h3 className="font-bold text-md text-gray-900 truncate">{place.name}</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-md text-gray-900 truncate">{place.name}</h3>
+                  {place.busyLevel && (
+                    <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {place.busyLevel}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                  {place.description || "A beautiful place to visit near you."}
                 </p>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-gray-500 mt-10 text-center">
-          Detecting nearby places to visit...
-        </p>
+        <p className="text-gray-500 mt-10 text-center">Detecting nearby places to visit...</p>
       )}
 
       <style jsx>{`
