@@ -1,58 +1,69 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default function PlaceDetails() {
-  const searchParams = useSearchParams();
+  const sp = useSearchParams();
   const router = useRouter();
-  const lat = searchParams.get("lat");
-  const lon = searchParams.get("lon");
-  const image = searchParams.get("image");
 
-  const [place, setPlace] = useState<any>(null);
+  const name = decodeURIComponent(sp.get("name") || "Unknown Place");
+  const desc = decodeURIComponent(sp.get("desc") || "");
+  const lat = sp.get("lat");
+  const lon = sp.get("lon");
+  const image = sp.get("image") || "/fallback.jpg";
+
+  const [address, setAddress] = useState("");
 
   useEffect(() => {
+    // Optional: fetch a nicer address, but DO NOT change the title
     if (!lat || !lon) return;
-
-    async function fetchPlaceDetails() {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
-      );
-      const data = await res.json();
-      setPlace({
-        name: data.name || data.display_name || "Unknown Place",
-        address: data.display_name || "",
-      });
-    }
-
-    fetchPlaceDetails();
+    (async () => {
+      try {
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
+          {
+            headers: {
+              "Accept-Language": "en",
+              "User-Agent": "YourAppName/1.0 (contact@example.com)",
+            },
+            cache: "no-store",
+          }
+        );
+        const j = await r.json();
+        setAddress(j?.display_name || "");
+      } catch {
+      }
+    })();
   }, [lat, lon]);
-
-  if (!place) return <div className="p-10 text-center">Loading...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
       <div className="max-w-3xl mx-auto">
-        <button
-          onClick={() => router.back()}
-          className="text-[#16a085] font-medium mb-4 hover:underline"
-        >
+        <button onClick={() => router.back()} className="text-[#16a085] font-medium mb-4 hover:underline">
           ← Back
         </button>
 
-        <div className="rounded-2xl overflow-hidden shadow-md mb-4 aspect-[16/9] bg-gray-200 flex items-center justify-center">
-          {image ? (
-            <img src={image} alt={place.name} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-gray-500">No image available</span>
-          )}
+        <div className="rounded-2xl overflow-hidden shadow-md mb-4 aspect-[16/9] bg-gray-200">
+          <div className="relative w-full h-full">
+            <Image
+              src={decodeURIComponent(image)}
+              alt={name}
+              fill
+              sizes="(max-width: 768px) 100vw, 768px"
+              className="object-cover"
+            />
+          </div>
         </div>
 
-        <h1 className="text-3xl font-bold text-[#16a085] mb-3">{place.name}</h1>
-        <p className="text-gray-800 leading-relaxed text-base">{place.address}</p>
+        <h1 className="text-3xl font-bold text-[#16a085] mb-2">{name}</h1>
+
+        {address && <p className="text-sm text-gray-600 mb-3">{address}</p>}
+
+        {desc && <p className="text-gray-800 leading-relaxed text-base">{desc}</p>}
       </div>
     </div>
   );

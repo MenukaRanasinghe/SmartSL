@@ -47,7 +47,10 @@ export default function HomePage() {
         const withImages = await Promise.all(
           data.map(async (p) => {
             const cacheKey = `img-${p.name}`;
-            let image = typeof window !== "undefined" ? localStorage.getItem(cacheKey) || undefined : undefined;
+            let image =
+              typeof window !== "undefined"
+                ? localStorage.getItem(cacheKey) || undefined
+                : undefined;
 
             if (!image && UNSPLASH_KEY) {
               try {
@@ -92,7 +95,9 @@ export default function HomePage() {
     setLoading(true);
     try {
       const geoRes = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}+Sri+Lanka`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          searchQuery
+        )}+Sri+Lanka`,
         { headers: { "Accept-Language": "en" } }
       );
       const geoData = await geoRes.json();
@@ -126,7 +131,8 @@ export default function HomePage() {
             let image: string | undefined;
 
             const cacheKey = `image-${name}`;
-            if (typeof window !== "undefined") image = localStorage.getItem(cacheKey) || undefined;
+            if (typeof window !== "undefined")
+              image = localStorage.getItem(cacheKey) || undefined;
 
             if (!image && GOOGLE_KEY && GOOGLE_CX) {
               try {
@@ -209,13 +215,16 @@ export default function HomePage() {
             {searchResults.map((place) => (
               <div
                 key={place.id}
-                onClick={() =>
+                onClick={() => {
                   router.push(
-                    `/place/${place.id}?lat=${place.lat}&lon=${place.lon}&image=${encodeURIComponent(
-                      place.image || ""
-                    )}`
-                  )
-                }
+                    `/place/${place.id}` +
+                      `?name=${encodeURIComponent(place.name)}` +
+                      `&desc=${encodeURIComponent(place.description || "")}` +
+                      `&lat=${place.lat}` +
+                      `&lon=${place.lon}` +
+                      `&image=${encodeURIComponent(place.image || "/fallback.jpg")}`
+                  );
+                }}
                 className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
               >
                 <div className="relative w-full h-36 overflow-hidden">
@@ -229,8 +238,7 @@ export default function HomePage() {
                 </div>
                 <div className="p-3">
                   <h3 className="font-bold text-md text-gray-900 truncate">{place.name}</h3>
-                  <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                  </p>
+                  <p className="text-xs text-gray-600 mt-1 line-clamp-2"></p>
                 </div>
               </div>
             ))}
@@ -238,19 +246,24 @@ export default function HomePage() {
         </div>
       )}
 
-      <h2 className="text-lg font-semibold text-gray-700 mb-2">Suggestions Near {location}</h2>
+      <h2 className="text-lg font-semibold text-gray-700 mb-2">
+        Suggestions Near {location}
+      </h2>
       {places.length > 0 ? (
         <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
           {places.map((place) => (
             <div
               key={place.id}
-              onClick={() =>
+              onClick={() => {
                 router.push(
-                  `/place/${place.id}?lat=${place.lat}&lon=${place.lon}&image=${encodeURIComponent(
-                    place.image || ""
-                  )}`
-                )
-              }
+                  `/place/${place.id}` +
+                    `?name=${encodeURIComponent(place.name)}` +
+                    `&desc=${encodeURIComponent(place.description || "")}` +
+                    `&lat=${place.lat}` +
+                    `&lon=${place.lon}` +
+                    `&image=${encodeURIComponent(place.image || "/fallback.jpg")}`
+                );
+              }}
               className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
             >
               <div className="relative w-full h-36 overflow-hidden">
@@ -271,14 +284,15 @@ export default function HomePage() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                </p>
+                <p className="text-xs text-gray-600 mt-1 line-clamp-2"></p>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-gray-500 mt-10 text-center">Detecting nearby places to visit...</p>
+        <p className="text-gray-500 mt-10 text-center">
+          Detecting nearby places to visit...
+        </p>
       )}
 
       <style jsx>{`
