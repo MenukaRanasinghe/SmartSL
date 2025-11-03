@@ -24,6 +24,18 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [detectedCity, setDetectedCity] = useState<{
+    name: string;
+    lat: number;
+    lon: number;
+    image: string;
+    desc?: string;
+  } | null>(null);
+  const [detectingCity, setDetectingCity] = useState<boolean>(false);
+
+  const [showDetectedModal, setShowDetectedModal] = useState(false);
+  const [detectedBusy, setDetectedBusy] = useState<"Quiet" | "Moderate" | "Busy" | "Very Busy" | "">("");
+
   const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
 
   const fetchPlaceImage = async (name: string): Promise<string> => {
@@ -51,7 +63,6 @@ export default function HomePage() {
         const wj = await wr.json();
         const pages = wj?.query?.pages ? Object.values(wj.query.pages as any) : [];
         const wikiThumb: string | undefined = pages?.[0]?.thumbnail?.source;
-
         if (wikiThumb) {
           if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
           return wikiThumb;
@@ -80,6 +91,61 @@ export default function HomePage() {
       return "/fallback.jpg";
     }
   };
+
+  useEffect(() => {
+    if (!("geolocation" in navigator)) return;
+
+    setDetectingCity(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+
+          const url = new URL("https://nominatim.openstreetmap.org/reverse");
+          url.searchParams.set("format", "jsonv2");
+          url.searchParams.set("lat", String(latitude));
+          url.searchParams.set("lon", String(longitude));
+          const r = await fetch(url.toString(), {
+            headers: {
+              "Accept-Language": "en",
+              "User-Agent": "YourAppName/1.0 (contact@example.com)",
+            },
+            cache: "no-store",
+          });
+          const j = await r.json();
+
+          const addr = j?.address || {};
+          const cityName: string =
+            addr.city ||
+            addr.town ||
+            addr.village ||
+            addr.suburb ||
+            addr.state_district ||
+            addr.county ||
+            "Nearby City";
+
+          const img = await fetchPlaceImage(cityName);
+
+          setDetectedCity({
+            name: cityName,
+            lat: latitude,
+            lon: longitude,
+            image: img,
+            desc: j?.display_name || "",
+          });
+        } catch {
+          setDetectedCity(null);
+        } finally {
+          setDetectingCity(false);
+        }
+      },
+      () => {
+        setDetectingCity(false);
+        setDetectedCity(null);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }, []); 
 
   useEffect(() => {
     const fetchColomboPlaces = async () => {
@@ -196,6 +262,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
       <h1 className="text-xl font-bold text-[#16a085] mb-3">Discover Places</h1>
 
+      {/* Search */}
       <div className="flex mb-4 gap-2">
         <input
           type="text"
@@ -218,7 +285,7 @@ export default function HomePage() {
 
       {searchResults.length > 0 && (
         <div className="mb-6">
-          <h2 className="font-semibold text-gray-700 mb-2">Sugesstions near {location}</h2>
+          <h2 className="font-semibold text-gray-700 mb-2">Suggestions near {location}</h2>
           <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
             {searchResults.map((place) => (
               <div
@@ -244,12 +311,50 @@ export default function HomePage() {
         </div>
       )}
 
-      <h2 className="text-lg font-semibold text-gray-700 mb-2">
-        Suggestions 
-      </h2>
-      {places.length > 0 ? (
-        <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
-          {places.map((place) => (
+      <h2 className="text-lg font-semibold text-gray-700 mb-2">Suggestions</h2>
+
+      <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
+        {detectedCity && (
+          <div
+            key="detected-city"
+            onClick={() => setShowDetectedModal(true)}
+            className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
+          >
+            <div className="relative w-full h-36 overflow-hidden">
+              <Image
+                src={detectedCity.image || "/fallback.jpg"}
+                alt={detectedCity.name}
+                fill
+                sizes="240px"
+                className="object-cover transition-transform duration-300 hover:scale-105"
+              />
+            </div>
+            <div className="p-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-md text-gray-900 truncate">{detectedCity.name}</h3>
+                <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                  Detected
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                Click to choose a busy level…
+              </p>
+            </div>
+          </div>
+        )}
+
+        {detectingCity && (
+          <div className="w-60 flex-shrink-0 rounded-2xl bg-white border border-gray-100 shadow-md p-4">
+            <div className="animate-pulse space-y-2">
+              <div className="h-36 bg-gray-200 rounded-xl" />
+              <div className="h-4 bg-gray-200 rounded" />
+              <div className="h-3 bg-gray-100 rounded w-3/4" />
+            </div>
+          </div>
+        )}
+
+        {places.length > 0 ? (
+          places.map((place) => (
             <div
               key={place.id}
               onClick={() => pushToDetails(place)}
@@ -275,10 +380,108 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-          ))}
+          ))
+        ) : (
+          !detectingCity && (
+            <p className="text-gray-500 mt-10 text-center flex-shrink-0">
+              Detecting nearby places to visit...
+            </p>
+          )
+        )}
+      </div>
+
+      {showDetectedModal && detectedCity && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">{detectedCity.name}</h3>
+              <button
+                aria-label="Close"
+                className="text-gray-500 hover:text-gray-800"
+                onClick={() => setShowDetectedModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="rounded-xl overflow-hidden border mb-3">
+              <div className="relative w-full h-40">
+                <Image
+                  src={detectedCity.image || "/fallback.jpg"}
+                  alt={detectedCity.name}
+                  fill
+                  sizes="400px"
+                  className="object-cover"
+                />
+              </div>
+            </div>
+
+            {detectedCity.desc && (
+              <p className="text-xs text-gray-600 mb-3 line-clamp-2">{detectedCity.desc}</p>
+            )}
+
+            <p className="text-sm text-gray-600 mb-3">Select the current busy level for this place:</p>
+
+            <div className="grid grid-cols-2 gap-2">
+              {(["Quiet", "Moderate", "Busy", "Very Busy"] as const).map((lvl) => {
+                const isActive = detectedBusy === lvl;
+                return (
+                  <button
+                    key={lvl}
+                    onClick={() => setDetectedBusy(lvl)}
+                    className={`px-3 py-2 rounded-lg border text-sm ${
+                      lvl === "Quiet"
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                        : lvl === "Moderate"
+                        ? "bg-sky-50 border-sky-200 text-sky-700"
+                        : lvl === "Busy"
+                        ? "bg-amber-50 border-amber-200 text-amber-700"
+                        : "bg-rose-50 border-rose-200 text-rose-700"
+                    } ${isActive ? "ring-2 ring-[#16a085]" : ""}`}
+                  >
+                    {lvl}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                onClick={() => {
+                  setDetectedBusy("");
+                  setShowDetectedModal(false);
+                }}
+                className="px-4 py-2 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!detectedBusy}
+                onClick={() => {
+                  const url =
+                    `/place/detected-testing` +
+                    `?name=${encodeURIComponent(detectedCity.name)}` +
+                    `&desc=${encodeURIComponent(detectedCity.desc || "")}` +
+                    `&lat=${detectedCity.lat}` +
+                    `&lon=${detectedCity.lon}` +
+                    `&image=${encodeURIComponent(detectedCity.image || "/fallback.jpg")}` +
+                    `&busy=${encodeURIComponent(detectedBusy)}`;
+                  setShowDetectedModal(false);
+                  router.push(url);
+                }}
+                className={`px-4 py-2 rounded-md text-white ${
+                  detectedBusy ? "bg-[#16a085] hover:bg-[#13856d]" : "bg-gray-300 cursor-not-allowed"
+                }`}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
         </div>
-      ) : (
-        <p className="text-gray-500 mt-10 text-center">Detecting nearby places to visit...</p>
       )}
 
       <style jsx>{`
