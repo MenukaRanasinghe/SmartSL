@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { auth } from "../../src/firebase/config";
 import { onAuthStateChanged, signInAnonymously, User } from "firebase/auth";
 
@@ -18,7 +19,7 @@ type Visit = {
   id: string;
   name: string;
   image?: string;
-  visitedAt?: number; // ms
+  visitedAt?: number; 
 };
 
 type PlaceCard = {
@@ -265,11 +266,13 @@ export default function ProfilePage() {
               {forYou.map((p) => (
                 <div key={p.id} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
                   <div className="relative h-32 w-full overflow-hidden">
-                    <img
+                    <Image
                       src={p.image || FALLBACK_IMG}
                       alt={p.name}
-                      className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-                      loading="lazy"
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-cover transition-transform duration-300 hover:scale-105"
+                      priority={false}
                     />
                   </div>
                   <div className="p-3">
@@ -299,7 +302,14 @@ export default function ProfilePage() {
                 {saved.map((s) => (
                   <div key={s.id} className="w-48 min-w-[12rem] flex-shrink-0 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
                     <div className="relative h-28 w-full overflow-hidden">
-                      <img src={s.image || FALLBACK_IMG} alt={s.name} className="h-full w-full object-cover" loading="lazy" />
+                      <Image
+                        src={s.image || FALLBACK_IMG}
+                        alt={s.name}
+                        fill
+                        sizes="200px"
+                        className="object-cover"
+                        priority={false}
+                      />
                     </div>
                     <div className="p-3">
                       <div className="truncate text-sm font-semibold text-gray-900">{s.name}</div>
@@ -322,11 +332,13 @@ export default function ProfilePage() {
                 {visited.map((v) => (
                   <div key={v.id} className="w-48 min-w-[12rem] flex-shrink-0 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
                     <div className="relative h-28 w-full overflow-hidden">
-                      <img
+                      <Image
                         src={v.image || FALLBACK_IMG}
                         alt={v.name}
-                        className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-                        loading="lazy"
+                        fill
+                        sizes="200px"
+                        className="object-cover transition-transform duration-300 hover:scale-105"
+                        priority={false}
                       />
                     </div>
                     <div className="p-3">
@@ -343,8 +355,7 @@ export default function ProfilePage() {
 
           <section>
             <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
-              💡 <span className="font-medium">Pro tip:</span> Set your preferences first — home & search will adapt to
-              what you love.
+              💡 <span className="font-medium">Pro tip:</span> Set your preferences first — home & search will adapt to what you love.
             </div>
           </section>
         </div>
