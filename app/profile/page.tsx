@@ -15,36 +15,21 @@ const CATEGORIES = [
 ] as const;
 type Preference = (typeof CATEGORIES)[number];
 
-type Visit = {
-  id: string;
-  name: string;
-  image?: string;
-  visitedAt?: number; 
-};
-
+type Visit = { id: string; name: string; image?: string; visitedAt?: number };
 type PlaceCard = {
   id: string;
   name: string;
-  image: string;
+  image?: string;
   category: Preference;
   city?: string;
   distanceKm?: number;
   desc?: string;
 };
 
-function abortableFetch(url: string, options: RequestInit = {}, ms = 8000) {
-  const ctrl = new AbortController();
-  const id = setTimeout(() => ctrl.abort(), ms);
-  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(id));
-}
-
-const FALLBACK_IMG = "/fallback.jpg";
-
-const CURATED_SRI_LANKA: PlaceCard[] = [
+const CURATED_SRI_LANKA_BASE: Omit<PlaceCard, "image">[] = [
   {
     id: "gl",
     name: "Galle Fort",
-    image: "https://images.unsplash.com/photo-1558980664-10eaaff9e372?q=80&w=1200&auto=format&fit=crop",
     category: "historical sites",
     city: "Galle",
     desc: "UNESCO-listed Dutch fort with ramparts & sea views.",
@@ -52,7 +37,6 @@ const CURATED_SRI_LANKA: PlaceCard[] = [
   {
     id: "sr",
     name: "Sigiriya Rock",
-    image: "https://images.unsplash.com/photo-1602416584693-97c4a0d2972a?q=80&w=1200&auto=format&fit=crop",
     category: "natural spots",
     city: "Dambulla",
     desc: "Ancient rock fortress with jaw-dropping panoramas.",
@@ -60,7 +44,6 @@ const CURATED_SRI_LANKA: PlaceCard[] = [
   {
     id: "kcc",
     name: "Kandy Cultural Show",
-    image: "https://images.unsplash.com/photo-1532561191419-7b52f7c20d02?q=80&w=1200&auto=format&fit=crop",
     category: "cultural events",
     city: "Kandy",
     desc: "Traditional dance & drums near the Temple of the Tooth.",
@@ -68,7 +51,6 @@ const CURATED_SRI_LANKA: PlaceCard[] = [
   {
     id: "gg",
     name: "Gangaramaya Temple",
-    image: "https://images.unsplash.com/photo-1583417319070-4a0e2860f1ea?q=80&w=1200&auto=format&fit=crop",
     category: "religious sites",
     city: "Colombo",
     desc: "Modern + traditional Buddhist architecture by Beira Lake.",
@@ -76,12 +58,87 @@ const CURATED_SRI_LANKA: PlaceCard[] = [
   {
     id: "jl",
     name: "Jaffna Local Eats",
-    image: "https://images.unsplash.com/photo-1533779283484-280a5b9e2852?q=80&w=1200&auto=format&fit=crop",
     category: "local food spots",
     city: "Jaffna",
     desc: "Spicy crab curry & street snacks worth a detour.",
   },
 ];
+
+const INLINE_FALLBACK =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='800'>
+      <defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+        <stop stop-color='#e5f9f4' offset='0'/><stop stop-color='#d1f2eb' offset='1'/>
+      </linearGradient></defs>
+      <rect fill='url(#g)' width='100%' height='100%'/>
+      <text x='50%' y='50%' text-anchor='middle' font-family='system-ui,Segoe UI,Arial' font-size='28' fill='#13856d'>
+        Image unavailable
+      </text>
+    </svg>`
+  );
+
+const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
+
+async function fetchPlaceImageByName(queries: string[] | string): Promise<string> {
+  const list = Array.isArray(queries) ? queries : [queries];
+  const cacheKey = `img-name-${list.join("|")}`;
+
+  try {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) return cached;
+    }
+
+    for (const raw of list) {
+      const q = `${raw} Sri Lanka`;
+
+      try {
+        const wikiURL = new URL("https://en.wikipedia.org/w/api.php");
+        wikiURL.searchParams.set("action", "query");
+        wikiURL.searchParams.set("format", "json");
+        wikiURL.searchParams.set("origin", "*");
+        wikiURL.searchParams.set("prop", "pageimages");
+        wikiURL.searchParams.set("generator", "search");
+        wikiURL.searchParams.set("gsrsearch", q);
+        wikiURL.searchParams.set("gsrlimit", "1");
+        wikiURL.searchParams.set("piprop", "thumbnail");
+        wikiURL.searchParams.set("pithumbsize", "1000");
+
+        const wr = await fetch(wikiURL.toString(), { cache: "no-store" });
+        const wj = await wr.json();
+        const pages = wj?.query?.pages ? Object.values(wj.query.pages as any) : [];
+        let wikiThumb: string | undefined = pages?.[0]?.thumbnail?.source;
+        if (wikiThumb) wikiThumb = wikiThumb.replace(/^\/\//, "https://");
+        if (wikiThumb) {
+          if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
+          return wikiThumb;
+        }
+      } catch {}
+
+      if (UNSPLASH_KEY) {
+        try {
+          const u = new URL("https://api.unsplash.com/search/photos");
+          u.searchParams.set("query", q);
+          u.searchParams.set("client_id", UNSPLASH_KEY);
+          u.searchParams.set("per_page", "1");
+          const r = await fetch(u.toString(), { cache: "no-store" });
+          const j = await r.json();
+          const url = j?.results?.[0]?.urls?.regular;
+          if (url) {
+            if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
+            return url;
+          }
+        } catch {}
+      }
+    }
+
+    if (typeof window !== "undefined") localStorage.setItem(cacheKey, INLINE_FALLBACK);
+    return INLINE_FALLBACK;
+  } catch {
+    return INLINE_FALLBACK;
+  }
+}
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -94,6 +151,10 @@ export default function ProfilePage() {
   const [draft, setDraft] = useState<Preference[]>([]);
   const [saving, setSaving] = useState(false);
   const [lastSync, setLastSync] = useState<number | null>(null);
+
+  const [curated, setCurated] = useState<PlaceCard[]>(
+    CURATED_SRI_LANKA_BASE.map((p) => ({ ...p, image: undefined }))
+  );
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -110,6 +171,46 @@ export default function ProfilePage() {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const withImgs = await Promise.all(
+        CURATED_SRI_LANKA_BASE.map(async (p) => {
+          const image = await fetchPlaceImageByName([p.name, p.city ?? "Sri Lanka"]);
+          return { ...p, image };
+        })
+      );
+      if (!cancelled) setCurated(withImgs);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!visited.length) return;
+    let cancelled = false;
+    (async () => {
+      const next = await Promise.all(
+        visited.map(async (v) => {
+          if (v.image && /^https?:\/\//.test(v.image)) return v;
+          const image = await fetchPlaceImageByName([v.name]);
+          return { ...v, image };
+        })
+      );
+      if (!cancelled) setVisited(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [visited.length]);
+
+  function abortableFetch(url: string, options: RequestInit = {}, ms = 8000) {
+    const ctrl = new AbortController();
+    const id = setTimeout(() => ctrl.abort(), ms);
+    return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(id));
+  }
 
   async function loadProfile(u: User) {
     setLoading(true);
@@ -149,9 +250,8 @@ export default function ProfilePage() {
     setMsg({ type: null });
     setOpen(true);
   };
-  const toggleDraft = (cat: Preference) => {
+  const toggleDraft = (cat: Preference) =>
     setDraft((d) => (d.includes(cat) ? d.filter((x) => x !== cat) : [...d, cat]));
-  };
 
   const save = async () => {
     if (!user?.uid) {
@@ -170,11 +270,7 @@ export default function ProfilePage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            uid: user.uid,
-            email: user.email || null,
-            preferences: next,
-          }),
+          body: JSON.stringify({ uid: user.uid, email: user.email || null, preferences: next }),
         },
         8000
       );
@@ -200,26 +296,19 @@ export default function ProfilePage() {
   const fmtDate = (ms?: number) =>
     !ms ? "" : new Date(ms).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 
-  const forYou: PlaceCard[] = useMemo(() => {
-    if (!prefs.length) return CURATED_SRI_LANKA.slice(0, 6);
-    const scored = CURATED_SRI_LANKA.map((p) => ({
-      place: p,
-      score: prefs.includes(p.category) ? 2 : 1,
-    }));
+  const forYouSeed: PlaceCard[] = useMemo(() => {
+    if (!prefs.length) return curated.slice(0, 6);
+    const scored = curated.map((p) => ({ place: p, score: p.image ? (prefs.includes(p.category) ? 2 : 1) : 0 }));
     scored.sort((a, b) => b.score - a.score);
     return scored.map((s) => s.place).slice(0, 6);
-  }, [prefs]);
-
-  const saved: PlaceCard[] = [];
+  }, [prefs, curated]);
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
       <div className="mb-4 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Your Travel Hub</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Plan smarter — preferences & history in one place.
-          </p>
+          <p className="mt-1 text-sm text-gray-600">Plan smarter — preferences & history in one place.</p>
         </div>
         <span
           title={emailLabel}
@@ -234,7 +323,7 @@ export default function ProfilePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-8 space-y-6">
+        <div className="space-y-6 lg:col-span-8">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <button
               onClick={openModal}
@@ -263,16 +352,15 @@ export default function ProfilePage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {forYou.map((p) => (
+              {forYouSeed.map((p) => (
                 <div key={p.id} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
                   <div className="relative h-32 w-full overflow-hidden">
                     <Image
-                      src={p.image || FALLBACK_IMG}
+                      src={p.image || INLINE_FALLBACK}
                       alt={p.name}
                       fill
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                       className="object-cover transition-transform duration-300 hover:scale-105"
-                      priority={false}
                     />
                   </div>
                   <div className="p-3">
@@ -292,39 +380,6 @@ export default function ProfilePage() {
 
           <section>
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Saved places</h3>
-              <Link href="/my-places" className="text-sm text-[#16a085] hover:underline">
-                View all
-              </Link>
-            </div>
-            {saved.length ? (
-              <div className="hide-scrollbar flex gap-4 overflow-x-auto pb-1">
-                {saved.map((s) => (
-                  <div key={s.id} className="w-48 min-w-[12rem] flex-shrink-0 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                    <div className="relative h-28 w-full overflow-hidden">
-                      <Image
-                        src={s.image || FALLBACK_IMG}
-                        alt={s.name}
-                        fill
-                        sizes="200px"
-                        className="object-cover"
-                        priority={false}
-                      />
-                    </div>
-                    <div className="p-3">
-                      <div className="truncate text-sm font-semibold text-gray-900">{s.name}</div>
-                      <div className="mt-1 text-[11px] text-gray-500 capitalize">{s.category}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">You haven’t saved any places yet.</p>
-            )}
-          </section>
-
-          <section>
-            <div className="mb-2 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Visited places</h3>
             </div>
             {visited.length ? (
@@ -333,17 +388,20 @@ export default function ProfilePage() {
                   <div key={v.id} className="w-48 min-w-[12rem] flex-shrink-0 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
                     <div className="relative h-28 w-full overflow-hidden">
                       <Image
-                        src={v.image || FALLBACK_IMG}
+                        src={v.image || INLINE_FALLBACK}
                         alt={v.name}
                         fill
                         sizes="200px"
                         className="object-cover transition-transform duration-300 hover:scale-105"
-                        priority={false}
                       />
                     </div>
                     <div className="p-3">
                       <div className="truncate text-sm font-semibold text-gray-900">{v.name}</div>
-                      {v.visitedAt && <div className="mt-1 text-[11px] text-gray-500">Visited: {fmtDate(v.visitedAt)}</div>}
+                      {v.visitedAt && (
+                        <div className="mt-1 text-[11px] text-gray-500">
+                          Visited: {fmtDate(v.visitedAt)}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -365,9 +423,7 @@ export default function ProfilePage() {
             <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Your preferences</h3>
-                <button onClick={openModal} className="text-sm font-medium text-[#16a085] hover:underline">
-                  Edit
-                </button>
+                <button onClick={openModal} className="text-sm font-medium text-[#16a085] hover:underline">Edit</button>
               </div>
 
               {loading ? (
@@ -375,10 +431,7 @@ export default function ProfilePage() {
               ) : prefs.length ? (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {prefs.map((p) => (
-                    <span
-                      key={p}
-                      className="capitalize text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    >
+                    <span key={p} className="capitalize text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                       {p}
                     </span>
                   ))}
@@ -399,14 +452,7 @@ export default function ProfilePage() {
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h4 className="text-lg font-semibold text-gray-900">Update preferences</h4>
-              <button
-                aria-label="Close"
-                className="text-gray-500 hover:text-gray-800"
-                onClick={() => setOpen(false)}
-                disabled={saving}
-              >
-                ✕
-              </button>
+              <button aria-label="Close" className="text-gray-500 hover:text-gray-800" onClick={() => setOpen(false)} disabled={saving}>✕</button>
             </div>
 
             <p className="mb-3 text-sm text-gray-600">Choose the categories you’re interested in:</p>
@@ -419,9 +465,7 @@ export default function ProfilePage() {
                     key={cat}
                     onClick={() => toggleDraft(cat)}
                     className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm capitalize ${
-                      active
-                        ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                        : "border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
+                      active ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
                     }`}
                     disabled={saving}
                   >
@@ -433,20 +477,10 @@ export default function ProfilePage() {
             </div>
 
             <div className="mt-5 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setOpen(false)}
-                className="rounded-md border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50"
-                disabled={saving}
-              >
+              <button onClick={() => setOpen(false)} className="rounded-md border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50" disabled={saving}>
                 Cancel
               </button>
-              <button
-                onClick={save}
-                disabled={saving}
-                className={`rounded-md px-4 py-2 text-white ${
-                  saving ? "bg-gray-300" : "bg-[#16a085] hover:bg-[#13856d]"
-                }`}
-              >
+              <button onClick={save} disabled={saving} className={`rounded-md px-4 py-2 text-white ${saving ? "bg-gray-300" : "bg-[#16a085] hover:bg-[#13856d]"}`}>
                 {saving ? "Saving…" : "Save"}
               </button>
             </div>

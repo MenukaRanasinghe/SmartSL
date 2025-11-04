@@ -29,6 +29,7 @@ const nextConfig: NextConfig = {
       "cdn.britannica.com",
       "static.toiimg.com",
       "assets.simpleviewinc.com",
+      "commons.wikimedia.org",
     ],
     unoptimized: true,
   },
