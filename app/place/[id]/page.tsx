@@ -59,7 +59,6 @@ export default function PlaceDetails() {
   const [address, setAddress] = useState("");
   const [forecast, setForecast] = useState<ForecastItem[]>([]);
   const [best, setBest] = useState<ForecastItem | null>(null);
-
   const [busyNow, setBusyNow] = useState<string>(busyParam);
 
   const [alt, setAlt] = useState<CrowdPlace | null>(null);
@@ -91,15 +90,21 @@ export default function PlaceDetails() {
         const wr = await fetch(wikiURL.toString(), { cache: "no-store" });
         const wj = (await wr.json()) as WikiQueryResponse;
 
-        const pages: WikiPage[] = Object.values(wj.query?.pages ?? {});
-        const wikiThumb = pages[0]?.thumbnail?.source;
+        const rawPages = wj.query?.pages
+          ? Object.values(wj.query.pages)
+          : [];
+
+        const pages = rawPages as WikiPage[];
+        const firstPage = pages.length > 0 ? pages[0] : undefined;
+        const wikiThumb = firstPage?.thumbnail?.source;
 
         if (wikiThumb) {
-          if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
-          return wikiThumb; 
+          if (typeof window !== "undefined") {
+            localStorage.setItem(cacheKey, wikiThumb);
+          }
+          return wikiThumb;
         }
-      } catch {
-      }
+      } catch {}
 
       if (UNSPLASH_KEY) {
         try {
@@ -111,23 +116,29 @@ export default function PlaceDetails() {
           const r = await fetch(u.toString(), { cache: "no-store" });
           const j = await r.json();
           const url: string | undefined = j?.results?.[0]?.urls?.regular;
+
           if (url) {
-            if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(cacheKey, url);
+            }
             return url;
           }
-        } catch {
-        }
+        } catch {}
       }
 
-      if (typeof window !== "undefined") localStorage.setItem(cacheKey, "/fallback.jpg");
+      if (typeof window !== "undefined") {
+        localStorage.setItem(cacheKey, "/fallback.jpg");
+      }
       return "/fallback.jpg";
     } catch {
       return "/fallback.jpg";
     }
   };
 
+
   useEffect(() => {
     if (!lat || !lon) return;
+
     (async () => {
       try {
         const r = await fetch(
@@ -135,25 +146,24 @@ export default function PlaceDetails() {
           {
             headers: {
               "Accept-Language": "en",
-              "User-Agent": "YourAppName/1.0 (contact@example.com)",
+              "User-Agent": "CrowdPlaces/1.0 (contact@example.com)",
             },
             cache: "no-store",
           }
         );
         const j = await r.json();
         setAddress(j?.display_name || "");
-      } catch {
-      }
+      } catch {}
     })();
   }, [lat, lon]);
+
 
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`/api/crowd?place=${encodeURIComponent(name)}&limit=12`, {
-          cache: "no-store",
-        });
+        const r = await fetch(`/api/crowd?place=${encodeURIComponent(name)}&limit=12`);
         const j = await r.json();
+
         setForecast(Array.isArray(j?.forecast) ? j.forecast : []);
         setBest(j?.best || null);
       } catch {
@@ -163,50 +173,52 @@ export default function PlaceDetails() {
     })();
   }, [name]);
 
+
   useEffect(() => {
     if (busyParam) return;
+
     (async () => {
       try {
-        const r = await fetch("/api/crowd", { cache: "no-store" });
+        const r = await fetch("/api/crowd");
         const list: CrowdPlace[] = await r.json();
+
         const match = list.find(
           (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase()
         );
+
         if (match?.busyLevel) setBusyNow(match.busyLevel);
-      } catch {
-      }
+      } catch {}
     })();
   }, [busyParam, name]);
 
+
   useEffect(() => {
     const b = (busyNow || "").toLowerCase();
-    const isBusy = b === "busy" || b === "very busy";
-    if (!isBusy) return;
+    if (!(b === "busy" || b === "very busy")) return;
 
     (async () => {
       setLoadingAlt(true);
       try {
-        const r = await fetch("/api/crowd", { cache: "no-store" });
+        const r = await fetch("/api/crowd");
         const list: CrowdPlace[] = await r.json();
 
         const altPlace =
           list.find(
             (p) =>
-              p.name.trim().toLowerCase() !== name.trim().toLowerCase() &&
+              p.name.toLowerCase() !== name.toLowerCase() &&
               p.busyLevel === "Quiet"
           ) ||
           list.find(
             (p) =>
-              p.name.trim().toLowerCase() !== name.trim().toLowerCase() &&
+              p.name.toLowerCase() !== name.toLowerCase() &&
               p.busyLevel === "Moderate"
           ) ||
           null;
 
-        if (altPlace) {
-          if (!altPlace.image) {
-            altPlace.image = await fetchPlaceImage(altPlace.name);
-          }
+        if (altPlace && !altPlace.image) {
+          altPlace.image = await fetchPlaceImage(altPlace.name);
         }
+
         setAlt(altPlace);
       } catch {
         setAlt(null);
@@ -216,19 +228,24 @@ export default function PlaceDetails() {
     })();
   }, [busyNow, name]);
 
+
   const bestHint = useMemo(() => {
     if (!best) return "";
+
     const dt = new Date(best.iso);
     const hh = dt.getHours().toString().padStart(2, "0");
     const nextHour = ((best.hour + 1) % 24).toString().padStart(2, "0");
+
     const today = new Date();
     const sameDay =
       dt.getFullYear() === today.getFullYear() &&
       dt.getMonth() === today.getMonth() &&
       dt.getDate() === today.getDate();
+
     const dayWord = sameDay
       ? "today"
       : dt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+
     return `Best time to visit: ${hh}:00–${nextHour}:00 ${dayWord} (${best.level}).`;
   }, [best]);
 
@@ -243,6 +260,7 @@ export default function PlaceDetails() {
       `&busy=${encodeURIComponent(p.busyLevel || "")}`;
     router.push(url);
   };
+
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
@@ -275,7 +293,8 @@ export default function PlaceDetails() {
             <div className="rounded-2xl border border-amber-200 bg-amber-50 text-amber-800 p-4">
               <div className="flex items-center justify-between">
                 <p className="font-medium">
-                  This place is currently <span className="font-semibold">{busyNow}</span>.
+                  This place is currently{" "}
+                  <span className="font-semibold">{busyNow}</span>.
                 </p>
                 {loadingAlt && <span className="text-xs">Finding alternatives…</span>}
               </div>
@@ -291,6 +310,7 @@ export default function PlaceDetails() {
                       className="object-cover"
                     />
                   </div>
+
                   <div className="flex-1">
                     <div className="text-sm text-gray-900">
                       Try <span className="font-semibold">{alt.name}</span> —{" "}
@@ -298,6 +318,7 @@ export default function PlaceDetails() {
                         {alt.busyLevel}
                       </span>
                     </div>
+
                     <button
                       className="mt-2 text-xs bg-[#16a085] text-white px-3 py-1 rounded-md hover:bg-[#13856d]"
                       onClick={() => pushToDetails(alt)}
@@ -308,7 +329,9 @@ export default function PlaceDetails() {
                 </div>
               ) : (
                 !loadingAlt && (
-                  <p className="text-xs text-amber-800 mt-2">No quieter alternatives found right now.</p>
+                  <p className="text-xs text-amber-800 mt-2">
+                    No quieter alternatives found right now.
+                  </p>
                 )
               )}
             </div>
@@ -327,6 +350,7 @@ export default function PlaceDetails() {
                   const dt = new Date(f.iso);
                   const hh = dt.getHours().toString().padStart(2, "0");
                   const isBest = best && best.iso === f.iso;
+
                   const badgeColors =
                     f.level === "Quiet"
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -335,6 +359,7 @@ export default function PlaceDetails() {
                       : f.level === "Busy"
                       ? "bg-amber-50 text-amber-700 border-amber-200"
                       : "bg-rose-50 text-rose-700 border-rose-200";
+
                   return (
                     <div
                       key={f.iso}
