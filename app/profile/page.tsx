@@ -13,6 +13,7 @@ const CATEGORIES = [
   "religious sites",
   "local food spots",
 ] as const;
+
 type Preference = (typeof CATEGORIES)[number];
 
 type Visit = { id: string; name: string; image?: string; visitedAt?: number };
@@ -80,6 +81,7 @@ const INLINE_FALLBACK =
 
 const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
 
+
 async function fetchPlaceImageByName(queries: string[] | string): Promise<string> {
   const list = Array.isArray(queries) ? queries : [queries];
   const cacheKey = `img-name-${list.join("|")}`;
@@ -93,37 +95,51 @@ async function fetchPlaceImageByName(queries: string[] | string): Promise<string
     for (const raw of list) {
       const q = `${raw} Sri Lanka`;
 
+    
       try {
-        const wikiURL = new URL("https://en.wikipedia.org/w/api.php");
-        wikiURL.searchParams.set("action", "query");
-        wikiURL.searchParams.set("format", "json");
-        wikiURL.searchParams.set("origin", "*");
-        wikiURL.searchParams.set("prop", "pageimages");
-        wikiURL.searchParams.set("generator", "search");
-        wikiURL.searchParams.set("gsrsearch", q);
-        wikiURL.searchParams.set("gsrlimit", "1");
-        wikiURL.searchParams.set("piprop", "thumbnail");
-        wikiURL.searchParams.set("pithumbsize", "1000");
+        const wiki = new URL("https://en.wikipedia.org/w/api.php");
+        wiki.searchParams.set("action", "query");
+        wiki.searchParams.set("format", "json");
+        wiki.searchParams.set("origin", "*");
+        wiki.searchParams.set("prop", "pageimages");
+        wiki.searchParams.set("generator", "search");
+        wiki.searchParams.set("gsrsearch", q);
+        wiki.searchParams.set("gsrlimit", "1");
+        wiki.searchParams.set("piprop", "thumbnail");
+        wiki.searchParams.set("pithumbsize", "1000");
 
-        const wr = await fetch(wikiURL.toString(), { cache: "no-store" });
+        const wr = await fetch(wiki.toString(), { cache: "no-store" });
         const wj = await wr.json();
-        const pages = wj?.query?.pages ? Object.values(wj.query.pages as any) : [];
-        let wikiThumb: string | undefined = pages?.[0]?.thumbnail?.source;
-        if (wikiThumb) wikiThumb = wikiThumb.replace(/^\/\//, "https://");
+
+        const rawPages = wj?.query?.pages ?? {};
+        const pages: any[] = Object.values(rawPages);
+
+        let wikiThumb: string | undefined = undefined;
+
+        if (pages.length > 0 && typeof pages[0] === "object") {
+          const thumb = pages[0]?.thumbnail?.source;
+          if (typeof thumb === "string") {
+            wikiThumb = thumb.replace(/^\/\//, "https://");
+          }
+        }
+
         if (wikiThumb) {
           if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
           return wikiThumb;
         }
       } catch {}
 
+    
       if (UNSPLASH_KEY) {
         try {
           const u = new URL("https://api.unsplash.com/search/photos");
           u.searchParams.set("query", q);
           u.searchParams.set("client_id", UNSPLASH_KEY);
           u.searchParams.set("per_page", "1");
+
           const r = await fetch(u.toString(), { cache: "no-store" });
           const j = await r.json();
+
           const url = j?.results?.[0]?.urls?.regular;
           if (url) {
             if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
@@ -169,20 +185,24 @@ export default function ProfilePage() {
         setUser(u);
       }
     });
+
     return () => unsub();
   }, []);
 
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       const withImgs = await Promise.all(
         CURATED_SRI_LANKA_BASE.map(async (p) => {
-          const image = await fetchPlaceImageByName([p.name, p.city ?? "Sri Lanka"]);
-          return { ...p, image };
+          const img = await fetchPlaceImageByName([p.name, p.city ?? "Sri Lanka"]);
+          return { ...p, image: img };
         })
       );
+
       if (!cancelled) setCurated(withImgs);
     })();
+
     return () => {
       cancelled = true;
     };
@@ -191,36 +211,41 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!visited.length) return;
     let cancelled = false;
+
     (async () => {
       const next = await Promise.all(
         visited.map(async (v) => {
-          if (v.image && /^https?:\/\//.test(v.image)) return v;
-          const image = await fetchPlaceImageByName([v.name]);
-          return { ...v, image };
+          if (v.image?.startsWith("http")) return v;
+          const img = await fetchPlaceImageByName([v.name]);
+          return { ...v, image: img };
         })
       );
       if (!cancelled) setVisited(next);
     })();
+
     return () => {
       cancelled = true;
     };
   }, [visited.length]);
 
-  function abortableFetch(url: string, options: RequestInit = {}, ms = 8000) {
+  function abortableFetch(url: string, opt: RequestInit = {}, ms = 8000) {
     const ctrl = new AbortController();
     const id = setTimeout(() => ctrl.abort(), ms);
-    return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(id));
+    return fetch(url, { ...opt, signal: ctrl.signal }).finally(() => clearTimeout(id));
   }
 
   async function loadProfile(u: User) {
     setLoading(true);
     setMsg({ type: null });
+
     try {
       const url = u.email
         ? `/api/profile?email=${encodeURIComponent(u.email)}`
         : `/api/profile?uid=${encodeURIComponent(u.uid)}`;
+
       const r = await abortableFetch(url, { cache: "no-store" }, 8000);
       const j = await r.json();
+
       if (r.ok) {
         if (Array.isArray(j.preferences)) setPrefs(j.preferences);
         if (Array.isArray(j.visited)) setVisited(j.visited);
@@ -238,10 +263,12 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!user) return;
     loadProfile(user);
+
     const onVis = () => {
       if (document.visibilityState === "visible" && user) loadProfile(user);
     };
     document.addEventListener("visibilitychange", onVis);
+
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [user?.uid, user?.email]);
 
@@ -250,14 +277,16 @@ export default function ProfilePage() {
     setMsg({ type: null });
     setOpen(true);
   };
+
   const toggleDraft = (cat: Preference) =>
     setDraft((d) => (d.includes(cat) ? d.filter((x) => x !== cat) : [...d, cat]));
 
   const save = async () => {
     if (!user?.uid) {
-      setMsg({ type: "error", text: "No user ID yet. Try again in a second." });
+      setMsg({ type: "error", text: "No user ID yet. Try again." });
       return;
     }
+
     setSaving(true);
     setMsg({ type: null });
 
@@ -270,22 +299,30 @@ export default function ProfilePage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ uid: user.uid, email: user.email || null, preferences: next }),
+          body: JSON.stringify({
+            uid: user.uid,
+            email: user.email || null,
+            preferences: next,
+          }),
         },
         8000
       );
+
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j?.error || `Save failed (${res.status})`);
       }
+
       setMsg({ type: "success", text: "Preferences saved!" });
       setOpen(false);
       setLastSync(Date.now());
     } catch (e: any) {
-      console.error("Save API error:", e);
       setMsg({
         type: "error",
-        text: e?.name === "AbortError" ? "Request timed out. Please try again." : e?.message || "Save failed.",
+        text:
+          e?.name === "AbortError"
+            ? "Request timed out."
+            : e?.message || "Save failed.",
       });
     } finally {
       setSaving(false);
@@ -294,26 +331,37 @@ export default function ProfilePage() {
 
   const emailLabel = user?.email ?? (user ? "Anonymous" : "—");
   const fmtDate = (ms?: number) =>
-    !ms ? "" : new Date(ms).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    !ms
+      ? ""
+      : new Date(ms).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
 
   const forYouSeed: PlaceCard[] = useMemo(() => {
     if (!prefs.length) return curated.slice(0, 6);
-    const scored = curated.map((p) => ({ place: p, score: p.image ? (prefs.includes(p.category) ? 2 : 1) : 0 }));
+
+    const scored = curated.map((p) => ({
+      place: p,
+      score: p.image ? (prefs.includes(p.category) ? 2 : 1) : 0,
+    }));
+
     scored.sort((a, b) => b.score - a.score);
-    return scored.map((s) => s.place).slice(0, 6);
+
+    return scored.slice(0, 6).map((s) => s.place);
   }, [prefs, curated]);
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
+
       <div className="mb-4 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Your Travel Hub</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Your Travel Hub</h1>
           <p className="mt-1 text-sm text-gray-600">Plan smarter — preferences & history in one place.</p>
         </div>
-        <span
-          title={emailLabel}
-          className="inline-flex max-w-[50vw] items-center gap-2 truncate rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700"
-        >
+
+        <span className="inline-flex max-w-[50vw] items-center gap-2 truncate rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
           <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M4 7l8 5 8-5" />
             <rect x="4" y="4" width="16" height="16" rx="2" />
@@ -324,6 +372,7 @@ export default function ProfilePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-8">
+
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <button
               onClick={openModal}
@@ -331,12 +380,14 @@ export default function ProfilePage() {
             >
               🎯 Update preferences
             </button>
+
             <Link
               href="/"
               className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-left text-sm font-medium text-sky-800 hover:bg-sky-100"
             >
               📍 Find nearby places
             </Link>
+
             <Link
               href="/my-places"
               className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm font-medium text-amber-800 hover:bg-amber-100"
@@ -360,18 +411,19 @@ export default function ProfilePage() {
                       alt={p.name}
                       fill
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-300 hover:scale-105"
+                      className="object-cover hover:scale-105 transition-transform"
                     />
                   </div>
                   <div className="p-3">
                     <div className="flex items-center justify-between">
                       <div className="truncate text-sm font-semibold text-gray-900">{p.name}</div>
-                      <span className="ml-2 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] capitalize text-gray-700">
+                      <span className="ml-2 text-[10px] capitalize rounded-full border px-2 py-0.5 bg-gray-50 border-gray-200 text-gray-700">
                         {p.category}
                       </span>
                     </div>
+
                     {p.city && <div className="mt-1 text-xs text-gray-500">{p.city}</div>}
-                    {p.desc && <p className="mt-1 line-clamp-2 text-xs text-gray-600">{p.desc}</p>}
+                    {p.desc && <p className="mt-1 text-xs text-gray-600 line-clamp-2">{p.desc}</p>}
                   </div>
                 </div>
               ))}
@@ -382,21 +434,24 @@ export default function ProfilePage() {
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Visited places</h3>
             </div>
+
             {visited.length ? (
-              <div className="hide-scrollbar flex gap-4 overflow-x-auto pb-1">
+              <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-1">
                 {visited.map((v) => (
-                  <div key={v.id} className="w-48 min-w-[12rem] flex-shrink-0 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                  <div key={v.id} className="min-w-[12rem] w-48 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
                     <div className="relative h-28 w-full overflow-hidden">
                       <Image
                         src={v.image || INLINE_FALLBACK}
                         alt={v.name}
                         fill
                         sizes="200px"
-                        className="object-cover transition-transform duration-300 hover:scale-105"
+                        className="object-cover hover:scale-105 transition-transform"
                       />
                     </div>
+
                     <div className="p-3">
                       <div className="truncate text-sm font-semibold text-gray-900">{v.name}</div>
+
                       {v.visitedAt && (
                         <div className="mt-1 text-[11px] text-gray-500">
                           Visited: {fmtDate(v.visitedAt)}
@@ -413,25 +468,25 @@ export default function ProfilePage() {
 
           <section>
             <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
-              💡 <span className="font-medium">Pro tip:</span> Set your preferences first — home & search will adapt to what you love.
+              💡 <span className="font-medium">Pro tip:</span> Set your preferences — your homepage & recommendations update instantly.
             </div>
           </section>
         </div>
 
         <aside className="lg:col-span-4">
           <div className="lg:sticky lg:top-4">
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border bg-white shadow-sm p-5 border-gray-200">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Your preferences</h3>
                 <button onClick={openModal} className="text-sm font-medium text-[#16a085] hover:underline">Edit</button>
               </div>
 
               {loading ? (
-                <p className="mt-4 text-sm text-gray-500">Loading…</p>
+                <p className="mt-4 text-sm text-gray-500">Loading...</p>
               ) : prefs.length ? (
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-4">
                   {prefs.map((p) => (
-                    <span key={p} className="capitalize text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span key={p} className="capitalize text-xs px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
                       {p}
                     </span>
                   ))}
@@ -448,26 +503,29 @@ export default function ProfilePage() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-5">
+
+            <div className="flex items-center justify-between mb-4">
               <h4 className="text-lg font-semibold text-gray-900">Update preferences</h4>
-              <button aria-label="Close" className="text-gray-500 hover:text-gray-800" onClick={() => setOpen(false)} disabled={saving}>✕</button>
+              <button disabled={saving} onClick={() => setOpen(false)} className="text-gray-500 hover:text-gray-800">✕</button>
             </div>
 
-            <p className="mb-3 text-sm text-gray-600">Choose the categories you’re interested in:</p>
+            <p className="text-sm text-gray-600 mb-3">Choose the categories you’re interested in:</p>
 
-            <div className="grid grid-cols-1 gap-2">
+            <div className="grid gap-2 grid-cols-1">
               {CATEGORIES.map((cat) => {
                 const active = draft.includes(cat);
                 return (
                   <button
                     key={cat}
-                    onClick={() => toggleDraft(cat)}
-                    className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm capitalize ${
-                      active ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-gray-200 bg-white text-gray-800 hover:bg-gray-50"
-                    }`}
                     disabled={saving}
+                    onClick={() => toggleDraft(cat)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-lg border text-sm capitalize ${
+                      active
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                        : "bg-white border-gray-200 text-gray-800 hover:bg-gray-50"
+                    }`}
                   >
                     <span>{cat}</span>
                     {active && <span>✓</span>}
@@ -476,11 +534,12 @@ export default function ProfilePage() {
               })}
             </div>
 
-            <div className="mt-5 flex items-center justify-end gap-2">
-              <button onClick={() => setOpen(false)} className="rounded-md border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50" disabled={saving}>
-                Cancel
-              </button>
-              <button onClick={save} disabled={saving} className={`rounded-md px-4 py-2 text-white ${saving ? "bg-gray-300" : "bg-[#16a085] hover:bg-[#13856d]"}`}>
+            <div className="flex justify-end gap-2 mt-5">
+              <button disabled={saving} onClick={() => setOpen(false)} className="px-4 py-2 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50">Cancel</button>
+
+              <button disabled={saving} onClick={save} className={`px-4 py-2 rounded-md text-white ${
+                saving ? "bg-gray-300" : "bg-[#16a085] hover:bg-[#13856d]"
+              }`}>
                 {saving ? "Saving…" : "Save"}
               </button>
             </div>
