@@ -95,7 +95,7 @@ export default function HomePage() {
 
           const wr = await fetch(wikiURL.toString(), { cache: "no-store" });
           const wj = await wr.json();
-          const pages = wj?.query?.pages ? Object.values(wj.query.pages as any) : [];
+          const pages = wj?.query?.pages ? Object.values(wj.query.pages as any[]) : [];
           let wikiThumb: string | undefined = pages?.[0]?.thumbnail?.source;
           if (wikiThumb) wikiThumb = wikiThumb.replace(/^\/\//, "https://");
           if (wikiThumb) {
