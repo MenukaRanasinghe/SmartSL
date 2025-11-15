@@ -116,7 +116,7 @@ export default function PlaceDetails() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`/api/ccrowd?place=${encodeURIComponent(name)}&limit=12`);
+        const r = await fetch(`/api/crowd?place=${encodeURIComponent(name)}&limit=12`);
         const j = await r.json();
 
         setForecast(Array.isArray(j?.forecast) ? j.forecast : []);
