@@ -149,7 +149,7 @@ export default function HomePage() {
       if (!qid) return null;
 
       const wd = await fetch(
-        `https://www.wikidata.org/wiki/Special:EntityData/${encodeURIComponent(qid)}.json`,
+        `https://www.wikidata.com/wiki/Special:EntityData/${encodeURIComponent(qid)}.json`,
         { cache: "no-store" }
       ).then((res) => res.json());
 
@@ -176,7 +176,7 @@ export default function HomePage() {
       api.searchParams.set("prop", "pageimages|coordinates");
       api.searchParams.set("generator", "geosearch");
       api.searchParams.set("ggscoord", `${lat}|${lon}`);
-      api.searchParams.set("ggsradius", "10000"); // 10km
+      api.searchParams.set("ggsradius", "10000");
       api.searchParams.set("ggslimit", "10");
       api.searchParams.set("pithumbsize", "1200");
 
@@ -440,7 +440,7 @@ export default function HomePage() {
           <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
             {searchResults.map((place) => (
               <div
-                key={place.id}
+                key={`${place.id}-${place.lat}-${place.lon}`}  
                 onClick={() => pushToDetails(place)}
                 className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
               >
@@ -505,7 +505,7 @@ export default function HomePage() {
         {places.length > 0 ? (
           places.map((place) => (
             <div
-              key={place.id}
+              key={`${place.id}-${place.lat}-${place.lon}`} 
               onClick={() => pushToDetails(place)}
               className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
             >
