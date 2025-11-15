@@ -69,8 +69,12 @@ export default function PlaceDetails() {
 
         const wr = await fetch(wikiURL.toString(), { cache: "no-store" });
         const wj = await wr.json();
-        const pages = wj?.query?.pages ? Object.values(wj.query.pages as any) : [];
-        const wikiThumb: string | undefined = pages?.[0]?.thumbnail?.source;
+        const pages = Object.values(wj?.query?.pages || {}) as {
+  thumbnail?: { source?: string };
+}[];
+
+const wikiThumb = pages[0]?.thumbnail?.source;
+
 
         if (wikiThumb) {
           if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
