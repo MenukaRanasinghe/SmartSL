@@ -44,6 +44,20 @@ export default function HomePage() {
 
   const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
 
+  const dedupe = (arr: Place[]) => {
+    const map = new Map();
+    arr.forEach((p) => {
+      const key = `${p.id}-${p.lat}-${p.lon}`;
+      if (!map.has(key)) {
+        map.set(key, p);
+      }
+    });
+    return Array.from(map.values());
+  };
+
+  const uniquePlaces = useMemo(() => dedupe(places), [places]);
+  const uniqueSearchResults = useMemo(() => dedupe(searchResults), [searchResults]);
+
   const buildDetectedImageQueries = (detectedName: string, addr: any): string[] => {
     const dn = (detectedName || "").toLowerCase();
     const aliasMatch = Object.entries(NEAREST_CITY_ALIAS).find(([alias]) => dn.includes(alias));
@@ -57,12 +71,7 @@ export default function HomePage() {
       addr?.county,
     ].filter(Boolean) as string[];
 
-    return [
-      ...aliasCities,
-      ...addrParts,
-      detectedName,
-      "Colombo",
-    ]
+    return [...aliasCities, ...addrParts, detectedName, "Colombo"]
       .filter(Boolean)
       .map((s) => s.trim())
       .filter((v, i, a) => a.findIndex((x) => x.toLowerCase() === v.toLowerCase()) === i);
@@ -128,6 +137,7 @@ export default function HomePage() {
     }
   };
 
+
   const fetchWikidataImageByCoords = async (lat: number, lon: number): Promise<string | null> => {
     try {
       const url = new URL("https://nominatim.openstreetmap.org/reverse");
@@ -140,16 +150,16 @@ export default function HomePage() {
       const r = await fetch(url.toString(), {
         headers: {
           "Accept-Language": "en",
-          "User-Agent": "CrowdPlaces/1.0 (contact@example.com)", 
+          "User-Agent": "CrowdPlaces/1.0 (contact@example.com)",
         },
         cache: "no-store",
       });
       const j = await r.json();
-      const qid: string | undefined = j?.extratags?.wikidata; 
+      const qid: string | undefined = j?.extratags?.wikidata;
       if (!qid) return null;
 
       const wd = await fetch(
-        `https://www.wikidata.com/wiki/Special:EntityData/${encodeURIComponent(qid)}.json`,
+        `https://www.wikidata.org/wiki/Special:EntityData/${encodeURIComponent(qid)}.json`,
         { cache: "no-store" }
       ).then((res) => res.json());
 
@@ -157,17 +167,15 @@ export default function HomePage() {
       const p18 = entity?.claims?.P18?.[0]?.mainsnak?.datavalue?.value as string | undefined;
       if (!p18) return null;
 
-      const commonsUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(
+      return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(
         p18
       )}?width=1200`;
-
-      return commonsUrl;
     } catch {
       return null;
     }
   };
 
-  const fetchWikipediaGeoImage = async (lat: number, lon: number): Promise<{ url: string; title?: string } | null> => {
+  const fetchWikipediaGeoImage = async (lat: number, lon: number): Promise<any | null> => {
     try {
       const api = new URL("https://en.wikipedia.org/w/api.php");
       api.searchParams.set("action", "query");
@@ -190,7 +198,7 @@ export default function HomePage() {
 
       let url = pick?.thumbnail?.source as string | undefined;
       if (url) url = url.replace(/^\/\//, "https://");
-      if (url) return { url, title: pick.title as string };
+      if (url) return { url };
 
       return null;
     } catch {
@@ -250,7 +258,7 @@ export default function HomePage() {
           const r = await fetch(url.toString(), {
             headers: {
               "Accept-Language": "en",
-              "User-Agent": "CrowdPlaces/1.0 (contact@example.com)", 
+              "User-Agent": "CrowdPlaces/1.0 (contact@example.com)",
             },
             cache: "no-store",
           });
@@ -289,6 +297,7 @@ export default function HomePage() {
     );
   }, []); 
 
+
   useEffect(() => {
     const fetchColomboPlaces = async () => {
       try {
@@ -300,7 +309,7 @@ export default function HomePage() {
         const data: Place[] = await res.json();
 
         if (!Array.isArray(data) || data.length === 0) {
-          setError("No Colombo district places found in Excel data.");
+          setError("No Colombo district places found.");
           setPlaces([]);
           return;
         }
@@ -314,8 +323,7 @@ export default function HomePage() {
 
         setPlaces(withImages);
       } catch (err: any) {
-        console.error("Error fetching Colombo places:", err);
-        setError("Failed to load Colombo attractions. Please try again later.");
+        setError("Failed to load Colombo attractions.");
       } finally {
         setLoading(false);
       }
@@ -323,6 +331,7 @@ export default function HomePage() {
 
     fetchColomboPlaces();
   }, [UNSPLASH_KEY]);
+
 
   const handleSearch = async () => {
     if (!searchQuery) {
@@ -386,12 +395,12 @@ export default function HomePage() {
       setSearchResults(results);
       setLocation(searchQuery);
     } catch (err) {
-      console.error(err);
       setSearchResults([]);
     } finally {
       setLoading(false);
     }
   };
+
 
   const pushToDetails = (place: Place) => {
     const url =
@@ -405,7 +414,11 @@ export default function HomePage() {
     router.push(url);
   };
 
-  const showDetectedCard = useMemo(() => !!detectedCity && !detectingCity, [detectedCity, detectingCity]);
+  const showDetectedCard = useMemo(
+    () => !!detectedCity && !detectingCity,
+    [detectedCity, detectingCity]
+  );
+
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
@@ -430,17 +443,17 @@ export default function HomePage() {
       </div>
 
       {error && <p className="text-red-600 mb-3">{error}</p>}
-      {loading && !searchResults.length && !places.length && (
-        <p className="text-gray-500 mb-2">Loading popular places...</p>
-      )}
 
-      {searchResults.length > 0 && (
+      {uniqueSearchResults.length > 0 && (
         <div className="mb-6">
-          <h2 className="font-semibold text-gray-700 mb-2">Suggestions near {location}</h2>
+          <h2 className="font-semibold text-gray-700 mb-2">
+            Suggestions near {location}
+          </h2>
+
           <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
-            {searchResults.map((place) => (
+            {uniqueSearchResults.map((place) => (
               <div
-                key={`${place.id}-${place.lat}-${place.lon}`}  
+                key={`${place.id}-${place.lat}-${place.lon}`}
                 onClick={() => pushToDetails(place)}
                 className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
               >
@@ -450,11 +463,13 @@ export default function HomePage() {
                     alt={place.name}
                     fill
                     sizes="240px"
-                    className="object-cover transition-transform duration-300 hover:scale-105"
+                    className="object-cover hover:scale-105 transition-transform"
                   />
                 </div>
                 <div className="p-3">
-                  <h3 className="font-bold text-md text-gray-900 truncate">{place.name}</h3>
+                  <h3 className="font-bold text-md text-gray-900 truncate">
+                    {place.name}
+                  </h3>
                 </div>
               </div>
             ))}
@@ -469,7 +484,7 @@ export default function HomePage() {
           <div
             key="detected-city"
             onClick={() => setShowDetectedModal(true)}
-            className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
+            className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition cursor-pointer border border-gray-100"
           >
             <div className="relative w-full h-36 overflow-hidden">
               <Image
@@ -477,17 +492,21 @@ export default function HomePage() {
                 alt={detectedCity.name}
                 fill
                 sizes="240px"
-                className="object-cover transition-transform duration-300 hover:scale-105"
+                className="object-cover hover:scale-105 transition-transform"
               />
             </div>
             <div className="p-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-md text-gray-900 truncate">{detectedCity.name}</h3>
+                <h3 className="font-bold text-md text-gray-900 truncate">
+                  {detectedCity.name}
+                </h3>
                 <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
                   Detected
                 </span>
               </div>
-              <p className="text-xs text-gray-600 mt-1 line-clamp-2">Click to choose a busy level…</p>
+              <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                Click to choose a busy level…
+              </p>
             </div>
           </div>
         )}
@@ -502,10 +521,10 @@ export default function HomePage() {
           </div>
         )}
 
-        {places.length > 0 ? (
-          places.map((place) => (
+        {uniquePlaces.length > 0 ? (
+          uniquePlaces.map((place) => (
             <div
-              key={`${place.id}-${place.lat}-${place.lon}`} 
+              key={`${place.id}-${place.lat}-${place.lon}`}
               onClick={() => pushToDetails(place)}
               className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
             >
@@ -515,12 +534,16 @@ export default function HomePage() {
                   alt={place.name}
                   fill
                   sizes="240px"
-                  className="object-cover transition-transform duration-300 hover:scale-105"
+                  className="object-cover hover:scale-105 transition-transform"
                 />
               </div>
+
               <div className="p-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-md text-gray-900 truncate">{place.name}</h3>
+                  <h3 className="font-bold text-md text-gray-900 truncate">
+                    {place.name}
+                  </h3>
+
                   {place.busyLevel && (
                     <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                       {place.busyLevel}
@@ -539,17 +562,16 @@ export default function HomePage() {
         )}
       </div>
 
+
+
       {showDetectedModal && detectedCity && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          role="dialog"
-          aria-modal="true"
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">{detectedCity.name}</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {detectedCity.name}
+              </h3>
               <button
-                aria-label="Close"
                 className="text-gray-500 hover:text-gray-800"
                 onClick={() => setShowDetectedModal(false)}
               >
@@ -570,10 +592,14 @@ export default function HomePage() {
             </div>
 
             {detectedCity.desc && (
-              <p className="text-xs text-gray-600 mb-3 line-clamp-2">{detectedCity.desc}</p>
+              <p className="text-xs text-gray-600 mb-3 line-clamp-2">
+                {detectedCity.desc}
+              </p>
             )}
 
-            <p className="text-sm text-gray-600 mb-3">Select the current busy level for this place:</p>
+            <p className="text-sm text-gray-600 mb-3">
+              Select the current busy level:
+            </p>
 
             <div className="grid grid-cols-2 gap-2">
               {(["Quiet", "Moderate", "Busy", "Very Busy"] as const).map((lvl) => {
@@ -583,13 +609,12 @@ export default function HomePage() {
                     key={lvl}
                     onClick={() => setDetectedBusy(lvl)}
                     className={`px-3 py-2 rounded-lg border text-sm ${
-                      lvl === "Quiet"
-                        ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                        : lvl === "Moderate"
-                        ? "bg-sky-50 border-sky-200 text-sky-700"
-                        : lvl === "Busy"
-                        ? "bg-amber-50 border-amber-200 text-amber-700"
-                        : "bg-rose-50 border-rose-200 text-rose-700"
+                      {
+                        Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
+                        Moderate: "bg-sky-50 border-sky-200 text-sky-700",
+                        Busy: "bg-amber-50 border-amber-200 text-amber-700",
+                        "Very Busy": "bg-rose-50 border-rose-200 text-rose-700",
+                      }[lvl]
                     } ${isActive ? "ring-2 ring-[#16a085]" : ""}`}
                   >
                     {lvl}
@@ -608,6 +633,7 @@ export default function HomePage() {
               >
                 Cancel
               </button>
+
               <button
                 disabled={!detectedBusy}
                 onClick={() => {
@@ -623,7 +649,9 @@ export default function HomePage() {
                   router.push(url);
                 }}
                 className={`px-4 py-2 rounded-md text-white ${
-                  detectedBusy ? "bg-[#16a085] hover:bg-[#13856d]" : "bg-gray-300 cursor-not-allowed"
+                  detectedBusy
+                    ? "bg-[#16a085] hover:bg-[#13856d]"
+                    : "bg-gray-300 cursor-not-allowed"
                 }`}
               >
                 Continue
@@ -634,8 +662,13 @@ export default function HomePage() {
       )}
 
       <style jsx>{`
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
       `}</style>
     </div>
   );
