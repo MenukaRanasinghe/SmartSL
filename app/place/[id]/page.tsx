@@ -9,7 +9,6 @@ type ForecastItem = {
   hour: number;
   level: string;
   score: number;
-  date?: string;
 };
 
 type CrowdPlace = {
@@ -20,20 +19,6 @@ type CrowdPlace = {
   image?: string;
   busyLevel?: string;
   description?: string;
-};
-
-type WikiPage = {
-  thumbnail?: {
-    source?: string;
-    width?: number;
-    height?: number;
-  };
-};
-
-type WikiQueryResponse = {
-  query?: {
-    pages?: Record<string, WikiPage>;
-  };
 };
 
 export default function PlaceDetails() {
@@ -66,55 +51,26 @@ export default function PlaceDetails() {
 
   const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
 
+ 
   const fetchPlaceImage = async (placeName: string): Promise<string> => {
     const cacheKey = `img-${placeName}`;
+
     try {
       if (typeof window !== "undefined") {
         const cached = localStorage.getItem(cacheKey);
         if (cached) return cached;
       }
 
-      try {
-        const q = `${placeName} Sri Lanka`;
-        const wikiURL = new URL("https://en.wikipedia.org/w/api.php");
-        wikiURL.searchParams.set("action", "query");
-        wikiURL.searchParams.set("format", "json");
-        wikiURL.searchParams.set("origin", "*");
-        wikiURL.searchParams.set("prop", "pageimages");
-        wikiURL.searchParams.set("generator", "search");
-        wikiURL.searchParams.set("gsrsearch", q);
-        wikiURL.searchParams.set("gsrlimit", "1");
-        wikiURL.searchParams.set("piprop", "thumbnail");
-        wikiURL.searchParams.set("pithumbsize", "800");
-
-        const wr = await fetch(wikiURL.toString(), { cache: "no-store" });
-        const wj = (await wr.json()) as WikiQueryResponse;
-
-        const rawPages = wj.query?.pages
-          ? Object.values(wj.query.pages)
-          : [];
-
-        const pages = rawPages as WikiPage[];
-        const firstPage = pages.length > 0 ? pages[0] : undefined;
-        const wikiThumb = firstPage?.thumbnail?.source;
-
-        if (wikiThumb) {
-          if (typeof window !== "undefined") {
-            localStorage.setItem(cacheKey, wikiThumb);
-          }
-          return wikiThumb;
-        }
-      } catch {}
-
       if (UNSPLASH_KEY) {
         try {
           const u = new URL("https://api.unsplash.com/search/photos");
-          u.searchParams.set("query", `${placeName} Sri Lanka`);
+          u.searchParams.set("query", placeName + " Sri Lanka");
           u.searchParams.set("client_id", UNSPLASH_KEY);
           u.searchParams.set("per_page", "1");
 
-          const r = await fetch(u.toString(), { cache: "no-store" });
+          const r = await fetch(u.toString());
           const j = await r.json();
+
           const url: string | undefined = j?.results?.[0]?.urls?.regular;
 
           if (url) {
@@ -146,9 +102,8 @@ export default function PlaceDetails() {
           {
             headers: {
               "Accept-Language": "en",
-              "User-Agent": "CrowdPlaces/1.0 (contact@example.com)",
+              "User-Agent": "CrowdPlaces/1.0",
             },
-            cache: "no-store",
           }
         );
         const j = await r.json();
@@ -161,7 +116,7 @@ export default function PlaceDetails() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`/api/crowd?place=${encodeURIComponent(name)}&limit=12`);
+        const r = await fetch(`/api/ccrowd?place=${encodeURIComponent(name)}&limit=12`);
         const j = await r.json();
 
         setForecast(Array.isArray(j?.forecast) ? j.forecast : []);
@@ -198,6 +153,7 @@ export default function PlaceDetails() {
 
     (async () => {
       setLoadingAlt(true);
+
       try {
         const r = await fetch("/api/crowd");
         const list: CrowdPlace[] = await r.json();
@@ -244,7 +200,11 @@ export default function PlaceDetails() {
 
     const dayWord = sameDay
       ? "today"
-      : dt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+      : dt.toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
 
     return `Best time to visit: ${hh}:00–${nextHour}:00 ${dayWord} (${best.level}).`;
   }, [best]);
@@ -258,9 +218,9 @@ export default function PlaceDetails() {
       `&lon=${p.lon}` +
       `&image=${encodeURIComponent(p.image || "/fallback.jpg")}` +
       `&busy=${encodeURIComponent(p.busyLevel || "")}`;
+
     router.push(url);
   };
-
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
@@ -286,9 +246,11 @@ export default function PlaceDetails() {
 
         <h1 className="text-3xl font-bold text-[#16a085] mb-2">{name}</h1>
         {address && <p className="text-sm text-gray-600 mb-3">{address}</p>}
-        {desc && <p className="text-gray-800 leading-relaxed text-base mb-6">{desc}</p>}
+        {desc && (
+          <p className="text-gray-800 leading-relaxed text-base mb-6">{desc}</p>
+        )}
 
-        {["Busy", "Very Busy"].includes(busyNow || "") && (
+        {["Busy", "Very Busy"].includes(busyNow) && (
           <div className="mb-6">
             <div className="rounded-2xl border border-amber-200 bg-amber-50 text-amber-800 p-4">
               <div className="flex items-center justify-between">
@@ -366,7 +328,6 @@ export default function PlaceDetails() {
                       className={`min-w-[84px] rounded-xl border px-3 py-2 text-center ${badgeColors} ${
                         isBest ? "ring-2 ring-[#16a085]" : ""
                       }`}
-                      title={new Date(f.iso).toLocaleString()}
                     >
                       <div className="text-xs font-medium">{hh}:00</div>
                       <div className="text-[11px]">{f.level}</div>
@@ -382,7 +343,9 @@ export default function PlaceDetails() {
               )}
             </>
           ) : (
-            <p className="text-sm text-gray-600">No forecast found for this place.</p>
+            <p className="text-sm text-gray-600">
+              No forecast found for this place.
+            </p>
           )}
         </div>
 
