@@ -1,6 +1,8 @@
+// next.config.ts
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  reactStrictMode: true,
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "www.lovesrilanka.org" },
@@ -31,9 +33,9 @@ const nextConfig: NextConfig = {
       "assets.simpleviewinc.com",
       "commons.wikimedia.org",
     ],
+ 
     unoptimized: true,
   },
-  reactStrictMode: true,
 };
 
-module.exports = nextConfig;
+export default nextConfig;

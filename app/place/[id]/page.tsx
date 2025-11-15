@@ -4,13 +4,11 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
 type ForecastItem = {
   iso: string;
   hour: number;
-  level: string; 
-  score: number; 
+  level: string;
+  score: number;
   date?: string;
 };
 
@@ -24,6 +22,20 @@ type CrowdPlace = {
   description?: string;
 };
 
+type WikiPage = {
+  thumbnail?: {
+    source?: string;
+    width?: number;
+    height?: number;
+  };
+};
+
+type WikiQueryResponse = {
+  query?: {
+    pages?: Record<string, WikiPage>;
+  };
+};
+
 export default function PlaceDetails() {
   const sp = useSearchParams();
   const router = useRouter();
@@ -32,7 +44,16 @@ export default function PlaceDetails() {
   const desc = decodeURIComponent(sp.get("desc") || "");
   const lat = sp.get("lat");
   const lon = sp.get("lon");
-  const image = sp.get("image") || "/fallback.jpg";
+
+  const imageParam = sp.get("image");
+  const image = (() => {
+    try {
+      return imageParam ? decodeURIComponent(imageParam) : "/fallback.jpg";
+    } catch {
+      return "/fallback.jpg";
+    }
+  })();
+
   const busyParam = decodeURIComponent(sp.get("busy") || "");
 
   const [address, setAddress] = useState("");
@@ -68,25 +89,17 @@ export default function PlaceDetails() {
         wikiURL.searchParams.set("pithumbsize", "800");
 
         const wr = await fetch(wikiURL.toString(), { cache: "no-store" });
-        const wj = await wr.json();
-       const pages = Object.values(wj?.query?.pages || {}) as Array<{
-  thumbnail?: { source?: string };
-}>;
+        const wj = (await wr.json()) as WikiQueryResponse;
 
-let wikiThumb: string | undefined;
-
-if (pages.length > 0 && pages[0]?.thumbnail?.source) {
-  wikiThumb = pages[0].thumbnail.source;
-  if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
-}
-
-
+        const pages: WikiPage[] = Object.values(wj.query?.pages ?? {});
+        const wikiThumb = pages[0]?.thumbnail?.source;
 
         if (wikiThumb) {
           if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
-          return wikiThumb;
+          return wikiThumb; 
         }
-      } catch {}
+      } catch {
+      }
 
       if (UNSPLASH_KEY) {
         try {
@@ -94,14 +107,16 @@ if (pages.length > 0 && pages[0]?.thumbnail?.source) {
           u.searchParams.set("query", `${placeName} Sri Lanka`);
           u.searchParams.set("client_id", UNSPLASH_KEY);
           u.searchParams.set("per_page", "1");
+
           const r = await fetch(u.toString(), { cache: "no-store" });
           const j = await r.json();
-          const url = j?.results?.[0]?.urls?.regular;
+          const url: string | undefined = j?.results?.[0]?.urls?.regular;
           if (url) {
             if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
             return url;
           }
-        } catch {}
+        } catch {
+        }
       }
 
       if (typeof window !== "undefined") localStorage.setItem(cacheKey, "/fallback.jpg");
@@ -127,14 +142,17 @@ if (pages.length > 0 && pages[0]?.thumbnail?.source) {
         );
         const j = await r.json();
         setAddress(j?.display_name || "");
-      } catch {}
+      } catch {
+      }
     })();
   }, [lat, lon]);
 
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch(`/api/crowd?place=${encodeURIComponent(name)}&limit=12`, { cache: "no-store" });
+        const r = await fetch(`/api/crowd?place=${encodeURIComponent(name)}&limit=12`, {
+          cache: "no-store",
+        });
         const j = await r.json();
         setForecast(Array.isArray(j?.forecast) ? j.forecast : []);
         setBest(j?.best || null);
@@ -155,7 +173,8 @@ if (pages.length > 0 && pages[0]?.thumbnail?.source) {
           (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase()
         );
         if (match?.busyLevel) setBusyNow(match.busyLevel);
-      } catch {}
+      } catch {
+      }
     })();
   }, [busyParam, name]);
 
@@ -228,14 +247,17 @@ if (pages.length > 0 && pages[0]?.thumbnail?.source) {
   return (
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
       <div className="max-w-3xl mx-auto">
-        <button onClick={() => router.back()} className="text-[#16a085] font-medium mb-4 hover:underline">
+        <button
+          onClick={() => router.back()}
+          className="text-[#16a085] font-medium mb-4 hover:underline"
+        >
           ← Back
         </button>
 
         <div className="rounded-2xl overflow-hidden shadow-md mb-4 aspect-[16/9] bg-gray-200">
           <div className="relative w-full h-full">
             <Image
-              src={decodeURIComponent(image)}
+              src={image}
               alt={name}
               fill
               sizes="(max-width: 768px) 100vw, 768px"
@@ -316,7 +338,9 @@ if (pages.length > 0 && pages[0]?.thumbnail?.source) {
                   return (
                     <div
                       key={f.iso}
-                      className={`min-w-[84px] rounded-xl border px-3 py-2 text-center ${badgeColors} ${isBest ? "ring-2 ring-[#16a085]" : ""}`}
+                      className={`min-w-[84px] rounded-xl border px-3 py-2 text-center ${badgeColors} ${
+                        isBest ? "ring-2 ring-[#16a085]" : ""
+                      }`}
                       title={new Date(f.iso).toLocaleString()}
                     >
                       <div className="text-xs font-medium">{hh}:00</div>
@@ -338,8 +362,13 @@ if (pages.length > 0 && pages[0]?.thumbnail?.source) {
         </div>
 
         <style jsx>{`
-          .hide-scrollbar::-webkit-scrollbar { display: none; }
-          .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+          .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+          .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
         `}</style>
       </div>
     </div>
