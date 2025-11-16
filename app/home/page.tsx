@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { auth } from "@/src/firebase/config";
 import { User, onAuthStateChanged, signInAnonymously } from "firebase/auth";
 
-
 interface Place {
   id: string;
   name: string;
@@ -34,30 +33,29 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
 
-
   const [detectedCity, setDetectedCity] = useState<{
     name: string;
     lat: number;
     lon: number;
     image: string;
     desc?: string;
-
+    busyLevel?: Busy;
   } | null>(null);
+
   const [detectingCity, setDetectingCity] = useState<boolean>(false);
-
-
   const [showDetectedModal, setShowDetectedModal] = useState(false);
   const [detectedBusy, setDetectedBusy] = useState<Busy>("");
 
   const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
 
+  /* ————————————————————————————————
+     DEDUPE
+  ———————————————————————————————— */
   const dedupe = (arr: Place[]) => {
     const map = new Map();
     arr.forEach((p) => {
       const key = `${p.id}-${p.lat}-${p.lon}`;
-      if (!map.has(key)) {
-        map.set(key, p);
-      }
+      if (!map.has(key)) map.set(key, p);
     });
     return Array.from(map.values());
   };
@@ -65,14 +63,9 @@ export default function HomePage() {
   const uniquePlaces = useMemo(() => dedupe(places), [places]);
   const uniqueSearchResults = useMemo(() => dedupe(searchResults), [searchResults]);
 
-
-
-
   const buildDetectedImageQueries = (detectedName: string, addr: any): string[] => {
     const dn = (detectedName || "").toLowerCase();
     const aliasMatch = Object.entries(NEAREST_CITY_ALIAS).find(([alias]) => dn.includes(alias));
-
-
     const aliasCities = aliasMatch ? aliasMatch[1] : [];
 
     const addrParts = [
@@ -87,9 +80,6 @@ export default function HomePage() {
       .filter(Boolean)
       .map((s) => s.trim())
       .filter((v, i, a) => a.findIndex((x) => x.toLowerCase() === v.toLowerCase()) === i);
-
-
-
   };
 
   const fetchPlaceImageByName = async (queries: string[] | string): Promise<string> => {
@@ -122,14 +112,12 @@ export default function HomePage() {
           const pages = wj?.query?.pages ? Object.values(wj.query.pages as any[]) : [];
           let wikiThumb: string | undefined = pages?.[0]?.thumbnail?.source;
           if (wikiThumb) wikiThumb = wikiThumb.replace(/^\/\//, "https://");
+
           if (wikiThumb) {
             if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
-
-
             return wikiThumb;
           }
-        } catch { }
-
+        } catch {}
 
         if (UNSPLASH_KEY) {
           try {
@@ -137,46 +125,37 @@ export default function HomePage() {
             u.searchParams.set("query", q);
             u.searchParams.set("client_id", UNSPLASH_KEY);
             u.searchParams.set("per_page", "1");
+
             const r = await fetch(u.toString(), { cache: "no-store" });
             const j = await r.json();
             const url = j?.results?.[0]?.urls?.regular;
+
             if (url) {
               if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
-
-
               return url;
             }
-          } catch { }
-
+          } catch {}
         }
       }
 
       if (typeof window !== "undefined") localStorage.setItem(cacheKey, "/fallback.jpg");
-
-
       return "/fallback.jpg";
     } catch {
       return "/fallback.jpg";
     }
   };
 
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) {
-        await signInAnonymously(auth);
-      } else {
-        setUser(u);
-      }
+      if (!u) await signInAnonymously(auth);
+      else setUser(u);
     });
-
     return () => unsub();
   }, []);
 
 
-
   const fetchWikidataImageByCoords = async (lat: number, lon: number): Promise<string | null> => {
-
-
     try {
       const url = new URL("https://nominatim.openstreetmap.org/reverse");
       url.searchParams.set("format", "jsonv2");
@@ -186,30 +165,24 @@ export default function HomePage() {
       url.searchParams.set("extratags", "1");
 
       const r = await fetch(url.toString(), {
-        headers: {
-          "Accept-Language": "en",
-          "User-Agent": "CrowdPlaces/1.0 (contact@example.com)",
-        },
+        headers: { "Accept-Language": "en", "User-Agent": "CrowdPlaces/1.0" },
         cache: "no-store",
       });
+
       const j = await r.json();
-      const qid: string | undefined = j?.extratags?.wikidata;
+      const qid = j?.extratags?.wikidata;
       if (!qid) return null;
 
       const wd = await fetch(
         `https://www.wikidata.org/wiki/Special:EntityData/${encodeURIComponent(qid)}.json`,
-
-
         { cache: "no-store" }
       ).then((res) => res.json());
 
       const entity = wd?.entities?.[qid];
-      const p18 = entity?.claims?.P18?.[0]?.mainsnak?.datavalue?.value as string | undefined;
+      const p18 = entity?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
       if (!p18) return null;
 
-      return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(
-        p18
-      )}?width=1200`;
+      return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(p18)}?width=1200`;
     } catch {
       return null;
     }
@@ -230,16 +203,17 @@ export default function HomePage() {
 
       const resp = await fetch(api.toString(), { cache: "no-store" });
       const data = await resp.json();
-      const pages = data?.query?.pages ? Object.values(data.query.pages as any) : [];
 
+      const pages = data?.query?.pages ? Object.values(data.query.pages as any) : [];
       const withThumb = pages.filter((p: any) => p?.thumbnail?.source);
       const pick = (withThumb[0] || pages[0]) as any;
+
       if (!pick) return null;
 
       let url = pick?.thumbnail?.source as string | undefined;
       if (url) url = url.replace(/^\/\//, "https://");
-      if (url) return { url };
 
+      if (url) return { url };
       return null;
     } catch {
       return null;
@@ -253,72 +227,37 @@ export default function HomePage() {
     addr: any
   ): Promise<string> => {
     const cacheKey = `img-geo-${lat.toFixed(4)},${lon.toFixed(4)}`;
+
     try {
       if (typeof window !== "undefined") {
         const cached = localStorage.getItem(cacheKey);
         if (cached) return cached;
       }
 
-      const wdImg = await fetchWikidataImageByCoords(lat, lon);
-      if (wdImg) {
-        if (typeof window !== "undefined") localStorage.setItem(cacheKey, wdImg);
-
-
-        return wdImg;
+      const wd = await fetchWikidataImageByCoords(lat, lon);
+      if (wd) {
+        if (typeof window !== "undefined") localStorage.setItem(cacheKey, wd);
+        return wd;
       }
 
-      const geoImg = await fetchWikipediaGeoImage(lat, lon);
-      if (geoImg?.url) {
-        if (typeof window !== "undefined") localStorage.setItem(cacheKey, geoImg.url);
-
-
-        return geoImg.url;
+      const geo = await fetchWikipediaGeoImage(lat, lon);
+      if (geo?.url) {
+        if (typeof window !== "undefined") localStorage.setItem(cacheKey, geo.url);
+        return geo.url;
       }
 
-      const candidates = buildDetectedImageQueries(detectedName, addr);
-      const named = await fetchPlaceImageByName(candidates);
+      const named = await fetchPlaceImageByName(
+        buildDetectedImageQueries(detectedName, addr)
+      );
+
       if (typeof window !== "undefined") localStorage.setItem(cacheKey, named);
-
-
-
       return named;
     } catch {
       return "/fallback.jpg";
     }
   };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   useEffect(() => {
-
     if (!("geolocation" in navigator)) return;
 
     setDetectingCity(true);
@@ -337,15 +276,15 @@ export default function HomePage() {
           const r = await fetch(url.toString(), {
             headers: {
               "Accept-Language": "en",
-              "User-Agent": "CrowdPlaces/1.0 (contact@example.com)",
+              "User-Agent": "CrowdPlaces/1.0",
             },
             cache: "no-store",
           });
 
           const j = await r.json();
-
           const addr = j?.address || {};
-          const cityName: string =
+
+          const cityName =
             addr.city ||
             addr.town ||
             addr.village ||
@@ -356,47 +295,26 @@ export default function HomePage() {
 
           const img = await fetchImageByCoordsFirst(latitude, longitude, cityName, addr);
 
-
-
-
-
-
-
-
-
-
           setDetectedCity({
             name: cityName,
             lat: latitude,
             lon: longitude,
             image: img,
             desc: j?.display_name || "",
-
           });
         } catch {
-
-
-
-
-
-
-
-
-
           setDetectedCity(null);
         } finally {
           setDetectingCity(false);
         }
       },
       () => {
-
         setDetectingCity(false);
         setDetectedCity(null);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   }, []);
-
 
   useEffect(() => {
     const fetchColomboPlaces = async () => {
@@ -406,6 +324,7 @@ export default function HomePage() {
 
         const res = await fetch("/api/crowd", { cache: "no-store" });
         if (!res.ok) throw new Error(`API returned status ${res.status}`);
+
         const data: Place[] = await res.json();
 
         if (!Array.isArray(data) || data.length === 0) {
@@ -422,8 +341,7 @@ export default function HomePage() {
         );
 
         setPlaces(withImages);
-      } catch (err: any) {
-
+      } catch {
         setError("Failed to load Colombo attractions.");
       } finally {
         setLoading(false);
@@ -433,7 +351,6 @@ export default function HomePage() {
     fetchColomboPlaces();
   }, [UNSPLASH_KEY]);
 
-
   const handleSearch = async () => {
     if (!searchQuery) {
       setSearchResults([]);
@@ -441,6 +358,7 @@ export default function HomePage() {
     }
 
     setLoading(true);
+
     try {
       const geoRes = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
@@ -449,15 +367,17 @@ export default function HomePage() {
         {
           headers: {
             "Accept-Language": "en",
-            "User-Agent": "CrowdPlaces/1.0 (contact@example.com)",
+            "User-Agent": "CrowdPlaces/1.0",
           },
         }
       );
+
       const geoData = await geoRes.json();
       if (!geoData[0]) {
         setSearchResults([]);
         return;
       }
+
       const { lat, lon } = geoData[0];
 
       const overpassQuery = `
@@ -469,19 +389,22 @@ export default function HomePage() {
         );
         out center tags;
       `;
+
       const overpassRes = await fetch("https://overpass-api.de/api/interpreter", {
         method: "POST",
         body: overpassQuery,
         headers: { "Content-Type": "text/plain" },
       });
+
       const overpassData = await overpassRes.json();
 
       const results: Place[] = await Promise.all(
         (overpassData.elements || [])
           .filter((el: any) => el.tags?.name)
           .map(async (el: any, idx: number) => {
-            const name: string = el.tags.name;
+            const name = el.tags.name;
             const image = await fetchPlaceImageByName([name, searchQuery]);
+
             return {
               id: String(el.id ?? idx),
               name,
@@ -495,14 +418,12 @@ export default function HomePage() {
 
       setSearchResults(results);
       setLocation(searchQuery);
-    } catch (err) {
-
+    } catch {
       setSearchResults([]);
     } finally {
       setLoading(false);
     }
   };
-
 
   const pushToDetails = (place: Place) => {
     const url =
@@ -513,6 +434,7 @@ export default function HomePage() {
       `&lon=${place.lon}` +
       `&image=${encodeURIComponent(place.image || "/fallback.jpg")}` +
       `&busy=${encodeURIComponent(place.busyLevel || "")}`;
+
     router.push(url);
   };
 
@@ -520,18 +442,6 @@ export default function HomePage() {
     () => !!detectedCity && !detectingCity,
     [detectedCity, detectingCity]
   );
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   return (
@@ -595,6 +505,7 @@ export default function HomePage() {
       <h2 className="text-lg font-semibold text-gray-700 mb-2">Suggestions</h2>
 
       <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
+       
         {showDetectedCard && detectedCity && (
           <div
             key="detected-city"
@@ -617,19 +528,27 @@ export default function HomePage() {
                   {detectedCity.name}
                 </h3>
 
-                <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
-                  Detected
-                </span>
+                {detectedCity.busyLevel && (
+                  <span
+                    className={`ml-2 text-[10px] px-2 py-0.5 rounded-full border ${
+                      {
+                        Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
+                        Moderate: "bg-sky-50 border-sky-200 text-sky-700",
+                        Busy: "bg-amber-50 border-amber-200 text-amber-700",
+                        "Very Busy":
+                          "bg-rose-50 border-rose-200 text-rose-700",
+                      }[detectedCity.busyLevel]
+                    }`}
+                  >
+                    {detectedCity.busyLevel}
+                  </span>
+                )}
               </div>
 
-
-
-
-
-
-
               <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                Click to choose a busy level…
+                {detectedCity.busyLevel
+                  ? `Busy Level: ${detectedCity.busyLevel}`
+                  : "Tap to select a busy level"}
               </p>
             </div>
           </div>
@@ -686,12 +605,9 @@ export default function HomePage() {
         )}
       </div>
 
-
-
       {showDetectedModal && detectedCity && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-5">
-
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
                 {detectedCity.name}
@@ -704,6 +620,7 @@ export default function HomePage() {
               </button>
             </div>
 
+            {/* IMAGE */}
             <div className="rounded-xl overflow-hidden border mb-3">
               <div className="relative w-full h-40">
                 <Image
@@ -722,24 +639,24 @@ export default function HomePage() {
               </p>
             )}
 
-            <p className="text-sm text-gray-600 mb-3">
-              Select the current busy level:
-            </p>
+            <p className="text-sm text-gray-600 mb-3">Select the current busy level:</p>
 
             <div className="grid grid-cols-2 gap-2">
               {(["Quiet", "Moderate", "Busy", "Very Busy"] as const).map((lvl) => {
                 const isActive = detectedBusy === lvl;
+
                 return (
                   <button
                     key={lvl}
                     onClick={() => setDetectedBusy(lvl)}
-                    className={`px-3 py-2 rounded-lg border text-sm ${{
-                      Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
-                      Moderate: "bg-sky-50 border-sky-200 text-sky-700",
-                      Busy: "bg-amber-50 border-amber-200 text-amber-700",
-                      "Very Busy": "bg-rose-50 border-rose-200 text-rose-700",
-                    }[lvl]
-                      } ${isActive ? "ring-2 ring-[#16a085]" : ""}`}
+                    className={`px-3 py-2 rounded-lg border text-sm ${
+                      {
+                        Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
+                        Moderate: "bg-sky-50 border-sky-200 text-sky-700",
+                        Busy: "bg-amber-50 border-amber-200 text-amber-700",
+                        "Very Busy": "bg-rose-50 border-rose-200 text-rose-700",
+                      }[lvl]
+                    } ${isActive ? "ring-2 ring-[#16a085]" : ""}`}
                   >
                     {lvl}
                   </button>
@@ -750,8 +667,11 @@ export default function HomePage() {
             <div className="flex items-center justify-end gap-2 mt-5">
               <button
                 onClick={() => {
-                  setDetectedBusy("");
+                  setDetectedCity((prev) =>
+                    prev ? { ...prev, busyLevel: detectedBusy } : prev
+                  );
                   setShowDetectedModal(false);
+                  setDetectedBusy("");
                 }}
                 className="px-4 py-2 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50"
               >
@@ -772,7 +692,7 @@ export default function HomePage() {
                       lon: detectedCity.lon,
                       image: detectedCity.image,
                       desc: detectedCity.desc || "",
-                      busy: detectedBusy,
+                      busyLevel: detectedBusy,
                       timestamp: now.getTime(),
                       hour: `${now.getHours().toString().padStart(2, "0")}:00`,
                       date: now.toISOString().slice(0, 10),
@@ -794,21 +714,18 @@ export default function HomePage() {
                     console.error("Save error:", err);
                   }
                 }}
-
-
-                className={`px-4 py-2 rounded-md text-white ${detectedBusy
-                  ? "bg-[#16a085] hover:bg-[#13856d]"
-                  : "bg-gray-300 cursor-not-allowed"
-                  }`}
+                className={`px-4 py-2 rounded-md text-white ${
+                  detectedBusy
+                    ? "bg-[#16a085] hover:bg-[#13856d]"
+                    : "bg-gray-300 cursor-not-allowed"
+                }`}
               >
                 Continue
               </button>
-
             </div>
           </div>
         </div>
       )}
-
 
       <style jsx>{`
         .hide-scrollbar::-webkit-scrollbar {
