@@ -48,9 +48,6 @@ export default function HomePage() {
 
   const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
 
-  /* ————————————————————————————————
-     DEDUPE
-  ———————————————————————————————— */
   const dedupe = (arr: Place[]) => {
     const map = new Map();
     arr.forEach((p) => {
@@ -117,7 +114,7 @@ export default function HomePage() {
             if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
             return wikiThumb;
           }
-        } catch {}
+        } catch { }
 
         if (UNSPLASH_KEY) {
           try {
@@ -134,7 +131,7 @@ export default function HomePage() {
               if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
               return url;
             }
-          } catch {}
+          } catch { }
         }
       }
 
@@ -505,7 +502,7 @@ export default function HomePage() {
       <h2 className="text-lg font-semibold text-gray-700 mb-2">Suggestions</h2>
 
       <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
-       
+
         {showDetectedCard && detectedCity && (
           <div
             key="detected-city"
@@ -530,19 +527,18 @@ export default function HomePage() {
 
                 {detectedCity.busyLevel && (
                   <span
-                    className={`ml-2 text-[10px] px-2 py-0.5 rounded-full border ${
-                      {
+                    className={`ml-2 text-[10px] px-2 py-0.5 rounded-full border ${{
                         Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
                         Moderate: "bg-sky-50 border-sky-200 text-sky-700",
                         Busy: "bg-amber-50 border-amber-200 text-amber-700",
-                        "Very Busy":
-                          "bg-rose-50 border-rose-200 text-rose-700",
+                        "Very Busy": "bg-rose-50 border-rose-200 text-rose-700",
                       }[detectedCity.busyLevel]
-                    }`}
+                      }`}
                   >
                     {detectedCity.busyLevel}
                   </span>
                 )}
+
               </div>
 
               <p className="text-xs text-gray-600 mt-1 line-clamp-2">
@@ -620,7 +616,6 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* IMAGE */}
             <div className="rounded-xl overflow-hidden border mb-3">
               <div className="relative w-full h-40">
                 <Image
@@ -649,14 +644,13 @@ export default function HomePage() {
                   <button
                     key={lvl}
                     onClick={() => setDetectedBusy(lvl)}
-                    className={`px-3 py-2 rounded-lg border text-sm ${
-                      {
+                    className={`px-3 py-2 rounded-lg border text-sm ${{
                         Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
                         Moderate: "bg-sky-50 border-sky-200 text-sky-700",
                         Busy: "bg-amber-50 border-amber-200 text-amber-700",
                         "Very Busy": "bg-rose-50 border-rose-200 text-rose-700",
                       }[lvl]
-                    } ${isActive ? "ring-2 ring-[#16a085]" : ""}`}
+                      } ${isActive ? "ring-2 ring-[#16a085]" : ""}`}
                   >
                     {lvl}
                   </button>
@@ -667,9 +661,8 @@ export default function HomePage() {
             <div className="flex items-center justify-end gap-2 mt-5">
               <button
                 onClick={() => {
-                  setDetectedCity((prev) =>
-                    prev ? { ...prev, busyLevel: detectedBusy } : prev
-                  );
+                  setDetectedCity(prev => prev ? { ...prev, busyLevel: detectedBusy } : prev);
+
                   setShowDetectedModal(false);
                   setDetectedBusy("");
                 }}
@@ -708,17 +701,24 @@ export default function HomePage() {
                       }),
                     });
 
+                    setDetectedCity(prev =>
+                      prev ? { ...prev, busyLevel: detectedBusy } : prev
+                    );
+
+                    setShowDetectedModal(false);
+                    setDetectedBusy("");
+
+
                     setShowDetectedModal(false);
                     setDetectedBusy("");
                   } catch (err) {
                     console.error("Save error:", err);
                   }
                 }}
-                className={`px-4 py-2 rounded-md text-white ${
-                  detectedBusy
+                className={`px-4 py-2 rounded-md text-white ${detectedBusy
                     ? "bg-[#16a085] hover:bg-[#13856d]"
                     : "bg-gray-300 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 Continue
               </button>
