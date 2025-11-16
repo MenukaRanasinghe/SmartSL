@@ -28,9 +28,14 @@ export async function POST(req: Request) {
       cleanPrefs = preferences.filter((p: string) => allowed.has(p));
     }
 
+    const baseRef = adminRtdb.ref(`/profile/${uid}`);
+    const existingSnap = await baseRef.get();
+    const existing = existingSnap.val() || {};
+
     const updates: Record<string, any> = {};
 
     updates[`/profile/${uid}`] = {
+      ...existing, 
       ...(cleanPrefs.length ? { preferences: cleanPrefs } : {}),
       ...(email ? { email } : {}),
       ...(lastLocation ? { lastLocation } : {}),

@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Save error:", err);
+    console.error("Save error (last-location):", err);
     return NextResponse.json(
       { error: "Failed to save last location." },
       { status: 500 }

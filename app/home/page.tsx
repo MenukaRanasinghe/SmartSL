@@ -3,6 +3,9 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { auth } from "@/src/firebase/config";
+import { User, onAuthStateChanged, signInAnonymously } from "firebase/auth";
+
 
 interface Place {
   id: string;
@@ -29,6 +32,8 @@ export default function HomePage() {
   const [searchResults, setSearchResults] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+
 
   const [detectedCity, setDetectedCity] = useState<{
     name: string;
@@ -123,7 +128,7 @@ export default function HomePage() {
 
             return wikiThumb;
           }
-        } catch {}
+        } catch { }
 
 
         if (UNSPLASH_KEY) {
@@ -141,7 +146,7 @@ export default function HomePage() {
 
               return url;
             }
-          } catch {}
+          } catch { }
 
         }
       }
@@ -154,6 +159,19 @@ export default function HomePage() {
       return "/fallback.jpg";
     }
   };
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (!u) {
+        await signInAnonymously(auth);
+      } else {
+        setUser(u);
+      }
+    });
+
+    return () => unsub();
+  }, []);
+
 
 
   const fetchWikidataImageByCoords = async (lat: number, lon: number): Promise<string | null> => {
@@ -377,7 +395,7 @@ export default function HomePage() {
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
-  }, []); 
+  }, []);
 
 
   useEffect(() => {
@@ -673,6 +691,7 @@ export default function HomePage() {
       {showDetectedModal && detectedCity && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-5">
+
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">
                 {detectedCity.name}
@@ -714,14 +733,13 @@ export default function HomePage() {
                   <button
                     key={lvl}
                     onClick={() => setDetectedBusy(lvl)}
-                    className={`px-3 py-2 rounded-lg border text-sm ${
-                      {
-                        Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
-                        Moderate: "bg-sky-50 border-sky-200 text-sky-700",
-                        Busy: "bg-amber-50 border-amber-200 text-amber-700",
-                        "Very Busy": "bg-rose-50 border-rose-200 text-rose-700",
-                      }[lvl]
-                    } ${isActive ? "ring-2 ring-[#16a085]" : ""}`}
+                    className={`px-3 py-2 rounded-lg border text-sm ${{
+                      Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
+                      Moderate: "bg-sky-50 border-sky-200 text-sky-700",
+                      Busy: "bg-amber-50 border-amber-200 text-amber-700",
+                      "Very Busy": "bg-rose-50 border-rose-200 text-rose-700",
+                    }[lvl]
+                      } ${isActive ? "ring-2 ring-[#16a085]" : ""}`}
                   >
                     {lvl}
                   </button>
@@ -742,30 +760,55 @@ export default function HomePage() {
 
               <button
                 disabled={!detectedBusy}
-                onClick={() => {
-                  const url =
-                    `/place/detected-testing` +
-                    `?name=${encodeURIComponent(detectedCity.name)}` +
-                    `&desc=${encodeURIComponent(detectedCity.desc || "")}` +
-                    `&lat=${detectedCity.lat}` +
-                    `&lon=${detectedCity.lon}` +
-                    `&image=${encodeURIComponent(detectedCity.image || "/fallback.jpg")}` +
-                    `&busy=${encodeURIComponent(detectedBusy)}`;
-                  setShowDetectedModal(false);
-                  router.push(url);
+                onClick={async () => {
+                  if (!detectedCity || !detectedBusy || !user?.uid) return;
+
+                  try {
+                    const now = new Date();
+
+                    const lastLocation = {
+                      name: detectedCity.name,
+                      lat: detectedCity.lat,
+                      lon: detectedCity.lon,
+                      image: detectedCity.image,
+                      desc: detectedCity.desc || "",
+                      busy: detectedBusy,
+                      timestamp: now.getTime(),
+                      hour: `${now.getHours().toString().padStart(2, "0")}:00`,
+                      date: now.toISOString().slice(0, 10),
+                    };
+
+                    await fetch("/api/profile", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        uid: user.uid,
+                        email: user.email || null,
+                        lastLocation,
+                      }),
+                    });
+
+                    setShowDetectedModal(false);
+                    setDetectedBusy("");
+                  } catch (err) {
+                    console.error("Save error:", err);
+                  }
                 }}
-                className={`px-4 py-2 rounded-md text-white ${
-                  detectedBusy
-                    ? "bg-[#16a085] hover:bg-[#13856d]"
-                    : "bg-gray-300 cursor-not-allowed"
-                }`}
+
+
+                className={`px-4 py-2 rounded-md text-white ${detectedBusy
+                  ? "bg-[#16a085] hover:bg-[#13856d]"
+                  : "bg-gray-300 cursor-not-allowed"
+                  }`}
               >
                 Continue
               </button>
+
             </div>
           </div>
         </div>
       )}
+
 
       <style jsx>{`
         .hide-scrollbar::-webkit-scrollbar {
