@@ -36,31 +36,35 @@ export default function HomePage() {
     lon: number;
     image: string;
     desc?: string;
+    busyLevel?: string;
   } | null>(null);
-  const [detectingCity, setDetectingCity] = useState<boolean>(false);
 
+  const [detectingCity, setDetectingCity] = useState<boolean>(false);
   const [showDetectedModal, setShowDetectedModal] = useState(false);
   const [detectedBusy, setDetectedBusy] = useState<Busy>("");
 
   const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
 
   const dedupe = (arr: Place[]) => {
-    const map = new Map();
+    const map = new Map<string, Place>();
     arr.forEach((p) => {
       const key = `${p.id}-${p.lat}-${p.lon}`;
-      if (!map.has(key)) {
-        map.set(key, p);
-      }
+      if (!map.has(key)) map.set(key, p);
     });
     return Array.from(map.values());
   };
 
   const uniquePlaces = useMemo(() => dedupe(places), [places]);
-  const uniqueSearchResults = useMemo(() => dedupe(searchResults), [searchResults]);
+  const uniqueSearchResults = useMemo(
+    () => dedupe(searchResults),
+    [searchResults]
+  );
 
   const buildDetectedImageQueries = (detectedName: string, addr: any): string[] => {
     const dn = (detectedName || "").toLowerCase();
-    const aliasMatch = Object.entries(NEAREST_CITY_ALIAS).find(([alias]) => dn.includes(alias));
+    const aliasMatch = Object.entries(NEAREST_CITY_ALIAS).find(([alias]) =>
+      dn.includes(alias)
+    );
     const aliasCities = aliasMatch ? aliasMatch[1] : [];
 
     const addrParts = [
@@ -74,7 +78,10 @@ export default function HomePage() {
     return [...aliasCities, ...addrParts, detectedName, "Colombo"]
       .filter(Boolean)
       .map((s) => s.trim())
-      .filter((v, i, a) => a.findIndex((x) => x.toLowerCase() === v.toLowerCase()) === i);
+      .filter(
+        (v, i, a) =>
+          a.findIndex((x) => x.toLowerCase() === v.toLowerCase()) === i
+      );
   };
 
   const fetchPlaceImageByName = async (queries: string[] | string): Promise<string> => {
@@ -108,10 +115,13 @@ export default function HomePage() {
           let wikiThumb: string | undefined = pages?.[0]?.thumbnail?.source;
           if (wikiThumb) wikiThumb = wikiThumb.replace(/^\/\//, "https://");
           if (wikiThumb) {
-            if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
+            if (typeof window !== "undefined") {
+              localStorage.setItem(cacheKey, wikiThumb);
+            }
             return wikiThumb;
           }
-        } catch {}
+        } catch {
+        }
 
         if (UNSPLASH_KEY) {
           try {
@@ -123,22 +133,29 @@ export default function HomePage() {
             const j = await r.json();
             const url = j?.results?.[0]?.urls?.regular;
             if (url) {
-              if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
+              if (typeof window !== "undefined") {
+                localStorage.setItem(cacheKey, url);
+              }
               return url;
             }
-          } catch {}
+          } catch {
+          }
         }
       }
 
-      if (typeof window !== "undefined") localStorage.setItem(cacheKey, "/fallback.jpg");
+      if (typeof window !== "undefined") {
+        localStorage.setItem(cacheKey, "/fallback.jpg");
+      }
       return "/fallback.jpg";
     } catch {
       return "/fallback.jpg";
     }
   };
 
-
-  const fetchWikidataImageByCoords = async (lat: number, lon: number): Promise<string | null> => {
+  const fetchWikidataImageByCoords = async (
+    lat: number,
+    lon: number
+  ): Promise<string | null> => {
     try {
       const url = new URL("https://nominatim.openstreetmap.org/reverse");
       url.searchParams.set("format", "jsonv2");
@@ -159,12 +176,14 @@ export default function HomePage() {
       if (!qid) return null;
 
       const wd = await fetch(
-        `https://www.wikidata.org/wiki/Special:EntityData/${encodeURIComponent(qid)}.json`,
+        `https://www.wikidata.org/wiki/Special:EntityData/${encodeURIComponent(
+          qid
+        )}.json`,
         { cache: "no-store" }
       ).then((res) => res.json());
 
       const entity = wd?.entities?.[qid];
-      const p18 = entity?.claims?.P18?.[0]?.mainsnak?.datavalue?.value as string | undefined;
+      const p18 = entity?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
       if (!p18) return null;
 
       return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(
@@ -175,7 +194,7 @@ export default function HomePage() {
     }
   };
 
-  const fetchWikipediaGeoImage = async (lat: number, lon: number): Promise<any | null> => {
+  const fetchWikipediaGeoImage = async (lat: number, lon: number) => {
     try {
       const api = new URL("https://en.wikipedia.org/w/api.php");
       api.searchParams.set("action", "query");
@@ -196,11 +215,10 @@ export default function HomePage() {
       const pick = (withThumb[0] || pages[0]) as any;
       if (!pick) return null;
 
-      let url = pick?.thumbnail?.source as string | undefined;
+      let url = pick?.thumbnail?.source;
       if (url) url = url.replace(/^\/\//, "https://");
-      if (url) return { url };
 
-      return null;
+      return url ? { url } : null;
     } catch {
       return null;
     }
@@ -221,29 +239,68 @@ export default function HomePage() {
 
       const wdImg = await fetchWikidataImageByCoords(lat, lon);
       if (wdImg) {
-        if (typeof window !== "undefined") localStorage.setItem(cacheKey, wdImg);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(cacheKey, wdImg);
+        }
         return wdImg;
       }
 
       const geoImg = await fetchWikipediaGeoImage(lat, lon);
       if (geoImg?.url) {
-        if (typeof window !== "undefined") localStorage.setItem(cacheKey, geoImg.url);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(cacheKey, geoImg.url);
+        }
         return geoImg.url;
       }
 
       const candidates = buildDetectedImageQueries(detectedName, addr);
       const named = await fetchPlaceImageByName(candidates);
-      if (typeof window !== "undefined") localStorage.setItem(cacheKey, named);
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(cacheKey, named);
+      }
       return named;
     } catch {
       return "/fallback.jpg";
     }
   };
 
+  async function logDetection(payload: {
+    name: string;
+    lat: number;
+    lon: number;
+    image: string;
+    desc?: string;
+    busy?: string;
+  }) {
+    try {
+      const now = new Date();
+      await fetch("/api/last-location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: payload.name,
+          lat: payload.lat,
+          lon: payload.lon,
+          image: payload.image,
+          desc: payload.desc || "",
+          busy: payload.busy ?? "",
+          timestamp: now.getTime(),
+          hour: `${now.getHours().toString().padStart(2, "0")}:00`,
+          date: now.toISOString().slice(0, 10),
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to log detection", err);
+    }
+  }
+
   useEffect(() => {
+    if (typeof window === "undefined") return;
     if (!("geolocation" in navigator)) return;
 
     setDetectingCity(true);
+
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
@@ -258,14 +315,15 @@ export default function HomePage() {
           const r = await fetch(url.toString(), {
             headers: {
               "Accept-Language": "en",
-              "User-Agent": "CrowdPlaces/1.0 (contact@example.com)",
+              "User-Agent": "CrowdPlaces/1.0",
             },
             cache: "no-store",
           });
+
           const j = await r.json();
 
           const addr = j?.address || {};
-          const cityName: string =
+          const cityName =
             addr.city ||
             addr.town ||
             addr.village ||
@@ -274,7 +332,16 @@ export default function HomePage() {
             addr.county ||
             "Nearby City";
 
-          const img = await fetchImageByCoordsFirst(latitude, longitude, cityName, addr);
+          let img = await fetchImageByCoordsFirst(
+            latitude,
+            longitude,
+            cityName,
+            addr
+          );
+
+          if (!img || img === "undefined" || img.trim() === "") {
+            img = "/fallback.jpg";
+          }
 
           setDetectedCity({
             name: cityName,
@@ -282,21 +349,31 @@ export default function HomePage() {
             lon: longitude,
             image: img,
             desc: j?.display_name || "",
+            busyLevel: "",
           });
-        } catch {
+
+          await logDetection({
+            name: cityName,
+            lat: latitude,
+            lon: longitude,
+            image: img,
+            desc: j?.display_name || "",
+          });
+        } catch (e) {
+          console.error("Detection failed:", e);
           setDetectedCity(null);
         } finally {
           setDetectingCity(false);
         }
       },
-      () => {
+      (err) => {
+        console.warn("Geolocation error:", err);
         setDetectingCity(false);
         setDetectedCity(null);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
-  }, []); 
-
+  }, []);
 
   useEffect(() => {
     const fetchColomboPlaces = async () => {
@@ -305,24 +382,20 @@ export default function HomePage() {
         setError(null);
 
         const res = await fetch("/api/crowd", { cache: "no-store" });
-        if (!res.ok) throw new Error(`API returned status ${res.status}`);
+        if (!res.ok) throw new Error(`API returned ${res.status}`);
+
         const data: Place[] = await res.json();
 
-        if (!Array.isArray(data) || data.length === 0) {
-          setError("No Colombo district places found.");
-          setPlaces([]);
-          return;
-        }
-
         const withImages = await Promise.all(
-          data.map(async (p) => {
-            const image = await fetchPlaceImageByName([p.name, "Colombo"]);
-            return { ...p, image };
-          })
+          data.map(async (p) => ({
+            ...p,
+            image: await fetchPlaceImageByName([p.name, "Colombo"]),
+          }))
         );
 
         setPlaces(withImages);
-      } catch (err: any) {
+      } catch (e) {
+        console.error(e);
         setError("Failed to load Colombo attractions.");
       } finally {
         setLoading(false);
@@ -332,75 +405,64 @@ export default function HomePage() {
     fetchColomboPlaces();
   }, [UNSPLASH_KEY]);
 
-
   const handleSearch = async () => {
-    if (!searchQuery) {
-      setSearchResults([]);
-      return;
-    }
+    if (!searchQuery) return setSearchResults([]);
 
     setLoading(true);
     try {
-      const geoRes = await fetch(
+      const geo = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
           searchQuery
         )}+Sri+Lanka`,
         {
           headers: {
             "Accept-Language": "en",
-            "User-Agent": "CrowdPlaces/1.0 (contact@example.com)",
+            "User-Agent": "CrowdPlaces/1.0",
           },
         }
-      );
-      const geoData = await geoRes.json();
-      if (!geoData[0]) {
-        setSearchResults([]);
-        return;
-      }
-      const { lat, lon } = geoData[0];
+      ).then((r) => r.json());
+
+      if (!geo[0]) return setSearchResults([]);
+
+      const { lat, lon } = geo[0];
 
       const overpassQuery = `
-        [out:json][timeout:25];
-        (
-          node["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:20000,${lat},${lon});
-          way["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:20000,${lat},${lon});
-          relation["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:20000,${lat},${lon});
-        );
-        out center tags;
-      `;
-      const overpassRes = await fetch("https://overpass-api.de/api/interpreter", {
+      [out:json][timeout:25];
+      (
+        node["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:20000,${lat},${lon});
+        way["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:20000,${lat},${lon});
+        relation["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:20000,${lat},${lon});
+      );
+      out center tags;`;
+
+      const o = await fetch("https://overpass-api.de/api/interpreter", {
         method: "POST",
         body: overpassQuery,
         headers: { "Content-Type": "text/plain" },
-      });
-      const overpassData = await overpassRes.json();
+      }).then((r) => r.json());
 
       const results: Place[] = await Promise.all(
-        (overpassData.elements || [])
+        (o.elements || [])
           .filter((el: any) => el.tags?.name)
-          .map(async (el: any, idx: number) => {
-            const name: string = el.tags.name;
-            const image = await fetchPlaceImageByName([name, searchQuery]);
-            return {
-              id: String(el.id ?? idx),
-              name,
-              lat: el.lat || el.center?.lat,
-              lon: el.lon || el.center?.lon,
-              image,
-              description: el.tags?.description || el.tags?.note || "",
-            };
-          })
+          .map(async (el: any, idx: number) => ({
+            id: String(el.id ?? idx),
+            name: el.tags.name,
+            lat: el.lat || el.center?.lat,
+            lon: el.lon || el.center?.lon,
+            image: await fetchPlaceImageByName([el.tags.name, searchQuery]),
+            description: el.tags?.description || el.tags?.note || "",
+          }))
       );
 
       setSearchResults(results);
       setLocation(searchQuery);
-    } catch (err) {
+    } catch (e) {
+      console.error(e);
       setSearchResults([]);
     } finally {
       setLoading(false);
     }
   };
-
 
   const pushToDetails = (place: Place) => {
     const url =
@@ -419,6 +481,18 @@ export default function HomePage() {
     [detectedCity, detectingCity]
   );
 
+  const saveDetectedPlace = async () => {
+    if (!detectedCity || !detectedBusy) return;
+
+    await logDetection({
+      name: detectedCity.name,
+      lat: detectedCity.lat,
+      lon: detectedCity.lon,
+      image: detectedCity.image,
+      desc: detectedCity.desc,
+      busy: detectedBusy,
+    });
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
@@ -434,9 +508,8 @@ export default function HomePage() {
         />
         <button
           onClick={handleSearch}
-          className="bg-[#16a085] text-white px-4 rounded-lg hover:bg-[#13856d]"
           disabled={loading}
-          aria-busy={loading}
+          className="bg-[#16a085] text-white px-4 rounded-lg hover:bg-[#13856d]"
         >
           {loading ? "Searching..." : "Search"}
         </button>
@@ -455,7 +528,7 @@ export default function HomePage() {
               <div
                 key={`${place.id}-${place.lat}-${place.lon}`}
                 onClick={() => pushToDetails(place)}
-                className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition overflow-hidden cursor-pointer border border-gray-100"
+                className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition cursor-pointer border border-gray-100"
               >
                 <div className="relative w-full h-36 overflow-hidden">
                   <Image
@@ -466,6 +539,7 @@ export default function HomePage() {
                     className="object-cover hover:scale-105 transition-transform"
                   />
                 </div>
+
                 <div className="p-3">
                   <h3 className="font-bold text-md text-gray-900 truncate">
                     {place.name}
@@ -484,7 +558,7 @@ export default function HomePage() {
           <div
             key="detected-city"
             onClick={() => setShowDetectedModal(true)}
-            className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md hover:shadow-xl transition cursor-pointer border border-gray-100"
+            className="bg-white w-60 flex-shrink-0 rounded-2xl shadow-md cursor-pointer hover:shadow-xl transition border border-gray-100"
           >
             <div className="relative w-full h-36 overflow-hidden">
               <Image
@@ -495,15 +569,24 @@ export default function HomePage() {
                 className="object-cover hover:scale-105 transition-transform"
               />
             </div>
+
             <div className="p-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-md text-gray-900 truncate">
                   {detectedCity.name}
                 </h3>
+
                 <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
                   Detected
                 </span>
               </div>
+
+              {detectedCity.busyLevel && (
+                <span className="mt-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
+                  {detectedCity.busyLevel}
+                </span>
+              )}
+
               <p className="text-xs text-gray-600 mt-1 line-clamp-2">
                 Click to choose a busy level…
               </p>
@@ -561,8 +644,6 @@ export default function HomePage() {
           )
         )}
       </div>
-
-
 
       {showDetectedModal && detectedCity && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -636,17 +717,14 @@ export default function HomePage() {
 
               <button
                 disabled={!detectedBusy}
-                onClick={() => {
-                  const url =
-                    `/place/detected-testing` +
-                    `?name=${encodeURIComponent(detectedCity.name)}` +
-                    `&desc=${encodeURIComponent(detectedCity.desc || "")}` +
-                    `&lat=${detectedCity.lat}` +
-                    `&lon=${detectedCity.lon}` +
-                    `&image=${encodeURIComponent(detectedCity.image || "/fallback.jpg")}` +
-                    `&busy=${encodeURIComponent(detectedBusy)}`;
+                onClick={async () => {
+                  await saveDetectedPlace();
+
+                  setDetectedCity((prev) =>
+                    prev ? { ...prev, busyLevel: detectedBusy } : prev
+                  );
+
                   setShowDetectedModal(false);
-                  router.push(url);
                 }}
                 className={`px-4 py-2 rounded-md text-white ${
                   detectedBusy
@@ -654,7 +732,7 @@ export default function HomePage() {
                     : "bg-gray-300 cursor-not-allowed"
                 }`}
               >
-                Continue
+                Save
               </button>
             </div>
           </div>

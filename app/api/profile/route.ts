@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminRtdb, RTDBServerTime } from "../../../src/firebase/admin";
+
 export const runtime = "nodejs";
 
 function emailKey(email: string) {
@@ -8,20 +9,31 @@ function emailKey(email: string) {
 
 export async function POST(req: Request) {
   try {
-    const { uid, email, preferences } = await req.json();
-    if (!uid || !Array.isArray(preferences)) {
-      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    const { uid, email, preferences, lastLocation } = await req.json();
+
+    if (!uid) {
+      return NextResponse.json({ error: "Missing UID" }, { status: 400 });
     }
 
     const allowed = new Set([
-      "historical sites", "natural spots", "cultural events", "religious sites", "local food spots",
+      "historical sites",
+      "natural spots",
+      "cultural events",
+      "religious sites",
+      "local food spots",
     ]);
-    const clean = preferences.filter((p: string) => allowed.has(p));
+
+    let cleanPrefs: string[] = [];
+    if (Array.isArray(preferences)) {
+      cleanPrefs = preferences.filter((p: string) => allowed.has(p));
+    }
 
     const updates: Record<string, any> = {};
+
     updates[`/profile/${uid}`] = {
-      preferences: clean,
-      email: email || null,
+      ...(cleanPrefs.length ? { preferences: cleanPrefs } : {}),
+      ...(email ? { email } : {}),
+      ...(lastLocation ? { lastLocation } : {}),
       updatedAt: RTDBServerTime,
     };
 
@@ -65,6 +77,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       preferences: Array.isArray(data?.preferences) ? data.preferences : [],
+      lastLocation: data?.lastLocation || null,
       email: data?.email || null,
     });
   } catch (e: any) {

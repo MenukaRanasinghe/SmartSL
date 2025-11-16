@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+
 import { auth } from "../../src/firebase/config";
 import { onAuthStateChanged, signInAnonymously, User } from "firebase/auth";
 
@@ -17,6 +18,17 @@ const CATEGORIES = [
 type Preference = (typeof CATEGORIES)[number];
 
 type Visit = { id: string; name: string; image?: string; visitedAt?: number };
+
+type LastLocation = {
+  name: string;
+  desc?: string;
+  lat: number;
+  lon: number;
+  image?: string;
+  busy?: string;
+  timestamp: number;
+};
+
 type PlaceCard = {
   id: string;
   name: string;
@@ -73,14 +85,11 @@ const INLINE_FALLBACK =
         <stop stop-color='#e5f9f4' offset='0'/><stop stop-color='#d1f2eb' offset='1'/>
       </linearGradient></defs>
       <rect fill='url(#g)' width='100%' height='100%'/>
-      <text x='50%' y='50%' text-anchor='middle' font-family='system-ui,Segoe UI,Arial' font-size='28' fill='#13856d'>
-        Image unavailable
-      </text>
+      <text x='50%' y='50%' text-anchor='middle' font-family='system-ui,Segoe UI,Arial' font-size='28' fill='#13856d'>Image unavailable</text>
     </svg>`
   );
 
 const UNSPLASH_KEY = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY;
-
 
 async function fetchPlaceImageByName(queries: string[] | string): Promise<string> {
   const list = Array.isArray(queries) ? queries : [queries];
@@ -95,7 +104,6 @@ async function fetchPlaceImageByName(queries: string[] | string): Promise<string
     for (const raw of list) {
       const q = `${raw} Sri Lanka`;
 
-    
       try {
         const wiki = new URL("https://en.wikipedia.org/w/api.php");
         wiki.searchParams.set("action", "query");
@@ -109,16 +117,20 @@ async function fetchPlaceImageByName(queries: string[] | string): Promise<string
         wiki.searchParams.set("pithumbsize", "1000");
 
         const wr = await fetch(wiki.toString(), { cache: "no-store" });
-        const wj = await wr.json();
+        const wj: {
+          query?: {
+            pages?: Record<string, { thumbnail?: { source?: string } }>;
+          };
+        } = await wr.json();
 
-        const rawPages = wj?.query?.pages ?? {};
-        const pages: any[] = Object.values(rawPages);
+        const rawPages = wj.query?.pages ?? {};
+        const pages = Object.values(rawPages);
 
-        let wikiThumb: string | undefined = undefined;
+        let wikiThumb: string | undefined;
 
-        if (pages.length > 0 && typeof pages[0] === "object") {
+        if (pages.length > 0) {
           const thumb = pages[0]?.thumbnail?.source;
-          if (typeof thumb === "string") {
+          if (thumb) {
             wikiThumb = thumb.replace(/^\/\//, "https://");
           }
         }
@@ -127,9 +139,9 @@ async function fetchPlaceImageByName(queries: string[] | string): Promise<string
           if (typeof window !== "undefined") localStorage.setItem(cacheKey, wikiThumb);
           return wikiThumb;
         }
-      } catch {}
+      } catch {
+      }
 
-    
       if (UNSPLASH_KEY) {
         try {
           const u = new URL("https://api.unsplash.com/search/photos");
@@ -140,12 +152,13 @@ async function fetchPlaceImageByName(queries: string[] | string): Promise<string
           const r = await fetch(u.toString(), { cache: "no-store" });
           const j = await r.json();
 
-          const url = j?.results?.[0]?.urls?.regular;
-          if (url) {
-            if (typeof window !== "undefined") localStorage.setItem(cacheKey, url);
-            return url;
+          const img: string | undefined = j?.results?.[0]?.urls?.regular;
+          if (img) {
+            if (typeof window !== "undefined") localStorage.setItem(cacheKey, img);
+            return img;
           }
-        } catch {}
+        } catch {
+        }
       }
     }
 
@@ -158,8 +171,11 @@ async function fetchPlaceImageByName(queries: string[] | string): Promise<string
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
+
   const [prefs, setPrefs] = useState<Preference[]>([]);
   const [visited, setVisited] = useState<Visit[]>([]);
+  const [lastLocation, setLastLocation] = useState<LastLocation | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error" | null; text?: string }>({ type: null });
 
@@ -175,17 +191,11 @@ export default function ProfilePage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
-        try {
-          await signInAnonymously(auth);
-        } catch (e: any) {
-          console.error("Anonymous sign-in failed:", e);
-          setMsg({ type: "error", text: e?.message || "Enable Anonymous Auth in Firebase." });
-        }
+        await signInAnonymously(auth);
       } else {
         setUser(u);
       }
     });
-
     return () => unsub();
   }, []);
 
@@ -199,7 +209,6 @@ export default function ProfilePage() {
           return { ...p, image: img };
         })
       );
-
       if (!cancelled) setCurated(withImgs);
     })();
 
@@ -210,6 +219,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!visited.length) return;
+
     let cancelled = false;
 
     (async () => {
@@ -220,6 +230,7 @@ export default function ProfilePage() {
           return { ...v, image: img };
         })
       );
+
       if (!cancelled) setVisited(next);
     })();
 
@@ -243,16 +254,15 @@ export default function ProfilePage() {
         ? `/api/profile?email=${encodeURIComponent(u.email)}`
         : `/api/profile?uid=${encodeURIComponent(u.uid)}`;
 
-      const r = await abortableFetch(url, { cache: "no-store" }, 8000);
+      const r = await abortableFetch(url, { cache: "no-store" });
       const j = await r.json();
 
-      if (r.ok) {
-        if (Array.isArray(j.preferences)) setPrefs(j.preferences);
-        if (Array.isArray(j.visited)) setVisited(j.visited);
-        setLastSync(Date.now());
-      } else {
-        throw new Error(j?.error || "Failed to load profile");
-      }
+      if (!r.ok) throw new Error(j?.error || "Failed to load profile");
+
+      if (Array.isArray(j.preferences)) setPrefs(j.preferences);
+      if (j.lastLocation) setLastLocation(j.lastLocation);
+
+      setLastSync(Date.now());
     } catch (e: any) {
       setMsg({ type: "error", text: e?.message || "Failed to load profile." });
     } finally {
@@ -267,8 +277,8 @@ export default function ProfilePage() {
     const onVis = () => {
       if (document.visibilityState === "visible" && user) loadProfile(user);
     };
-    document.addEventListener("visibilitychange", onVis);
 
+    document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [user?.uid, user?.email]);
 
@@ -319,10 +329,7 @@ export default function ProfilePage() {
     } catch (e: any) {
       setMsg({
         type: "error",
-        text:
-          e?.name === "AbortError"
-            ? "Request timed out."
-            : e?.message || "Save failed.",
+        text: e?.name === "AbortError" ? "Request timed out." : e?.message || "Save failed.",
       });
     } finally {
       setSaving(false);
@@ -330,7 +337,8 @@ export default function ProfilePage() {
   };
 
   const emailLabel = user?.email ?? (user ? "Anonymous" : "—");
-  const fmtDate = (ms?: number) =>
+
+  const fmtDate = (ms: number | undefined) =>
     !ms
       ? ""
       : new Date(ms).toLocaleDateString(undefined, {
@@ -348,13 +356,11 @@ export default function ProfilePage() {
     }));
 
     scored.sort((a, b) => b.score - a.score);
-
     return scored.slice(0, 6).map((s) => s.place);
   }, [prefs, curated]);
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-
       <div className="mb-4 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Your Travel Hub</h1>
@@ -362,7 +368,14 @@ export default function ProfilePage() {
         </div>
 
         <span className="inline-flex max-w-[50vw] items-center gap-2 truncate rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
-          <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            aria-hidden
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M4 7l8 5 8-5" />
             <rect x="4" y="4" width="16" height="16" rx="2" />
           </svg>
@@ -372,7 +385,6 @@ export default function ProfilePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-8">
-
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <button
               onClick={openModal}
@@ -404,7 +416,10 @@ export default function ProfilePage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {forYouSeed.map((p) => (
-                <div key={p.id} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <div
+                  key={p.id}
+                  className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
+                >
                   <div className="relative h-32 w-full overflow-hidden">
                     <Image
                       src={p.image || INLINE_FALLBACK}
@@ -423,7 +438,9 @@ export default function ProfilePage() {
                     </div>
 
                     {p.city && <div className="mt-1 text-xs text-gray-500">{p.city}</div>}
-                    {p.desc && <p className="mt-1 text-xs text-gray-600 line-clamp-2">{p.desc}</p>}
+                    {p.desc && (
+                      <p className="mt-1 text-xs text-gray-600 line-clamp-2">{p.desc}</p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -431,14 +448,52 @@ export default function ProfilePage() {
           </section>
 
           <section>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Visited places</h3>
-            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Last detected location</h3>
+
+            {lastLocation ? (
+              <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                <div className="relative h-36 w-full">
+                  <Image
+                    src={lastLocation.image || INLINE_FALLBACK}
+                    alt={lastLocation.name}
+                    fill
+                    sizes="400px"
+                    className="object-cover"
+                  />
+                </div>
+
+                <div className="p-3">
+                  <div className="font-semibold text-gray-900">{lastLocation.name}</div>
+                  {lastLocation.busy && (
+                    <div className="text-xs mt-1 text-amber-700 bg-amber-50 border border-amber-200 inline-block px-2 py-0.5 rounded-full">
+                      {lastLocation.busy}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-gray-500 mt-2">
+                    Detected: {fmtDate(lastLocation.timestamp)}
+                  </p>
+
+                  {lastLocation.desc && (
+                    <p className="mt-2 text-xs text-gray-600 line-clamp-3">{lastLocation.desc}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No location saved yet.</p>
+            )}
+          </section>
+
+          <section>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Visited places</h3>
 
             {visited.length ? (
               <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-1">
                 {visited.map((v) => (
-                  <div key={v.id} className="min-w-[12rem] w-48 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                  <div
+                    key={v.id}
+                    className="min-w-[12rem] w-48 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
+                  >
                     <div className="relative h-28 w-full overflow-hidden">
                       <Image
                         src={v.image || INLINE_FALLBACK}
@@ -468,7 +523,8 @@ export default function ProfilePage() {
 
           <section>
             <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
-              💡 <span className="font-medium">Pro tip:</span> Set your preferences — your homepage & recommendations update instantly.
+              💡 <span className="font-medium">Pro tip:</span> Set your preferences — your homepage &
+              recommendations update instantly.
             </div>
           </section>
         </div>
@@ -478,7 +534,12 @@ export default function ProfilePage() {
             <div className="rounded-2xl border bg-white shadow-sm p-5 border-gray-200">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-gray-900">Your preferences</h3>
-                <button onClick={openModal} className="text-sm font-medium text-[#16a085] hover:underline">Edit</button>
+                <button
+                  onClick={openModal}
+                  className="text-sm font-medium text-[#16a085] hover:underline"
+                >
+                  Edit
+                </button>
               </div>
 
               {loading ? (
@@ -486,17 +547,26 @@ export default function ProfilePage() {
               ) : prefs.length ? (
                 <div className="flex flex-wrap gap-2 mt-4">
                   {prefs.map((p) => (
-                    <span key={p} className="capitalize text-xs px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
+                    <span
+                      key={p}
+                      className="capitalize text-xs px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700"
+                    >
                       {p}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="mt-4 text-sm text-gray-500">No preferences yet — tap Edit to personalize.</p>
+                <p className="mt-4 text-sm text-gray-500">
+                  No preferences yet — tap Edit to personalize.
+                </p>
               )}
 
-              {msg.type === "error" && <p className="mt-3 text-sm text-rose-700">⚠️ {msg.text}</p>}
-              {msg.type === "success" && <p className="mt-3 text-sm text-emerald-700">✅ {msg.text}</p>}
+              {msg.type === "error" && (
+                <p className="mt-3 text-sm text-rose-700">⚠️ {msg.text}</p>
+              )}
+              {msg.type === "success" && (
+                <p className="mt-3 text-sm text-emerald-700">✅ {msg.text}</p>
+              )}
             </div>
           </div>
         </aside>
@@ -505,13 +575,20 @@ export default function ProfilePage() {
       {open && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
           <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-5">
-
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-lg font-semibold text-gray-900">Update preferences</h4>
-              <button disabled={saving} onClick={() => setOpen(false)} className="text-gray-500 hover:text-gray-800">✕</button>
+              <button
+                disabled={saving}
+                onClick={() => setOpen(false)}
+                className="text-gray-500 hover:text-gray-800"
+              >
+                ✕
+              </button>
             </div>
 
-            <p className="text-sm text-gray-600 mb-3">Choose the categories you’re interested in:</p>
+            <p className="text-sm text-gray-600 mb-3">
+              Choose the categories you’re interested in:
+            </p>
 
             <div className="grid gap-2 grid-cols-1">
               {CATEGORIES.map((cat) => {
@@ -535,11 +612,21 @@ export default function ProfilePage() {
             </div>
 
             <div className="flex justify-end gap-2 mt-5">
-              <button disabled={saving} onClick={() => setOpen(false)} className="px-4 py-2 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50">Cancel</button>
+              <button
+                disabled={saving}
+                onClick={() => setOpen(false)}
+                className="px-4 py-2 rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
 
-              <button disabled={saving} onClick={save} className={`px-4 py-2 rounded-md text-white ${
-                saving ? "bg-gray-300" : "bg-[#16a085] hover:bg-[#13856d]"
-              }`}>
+              <button
+                disabled={saving}
+                onClick={save}
+                className={`px-4 py-2 rounded-md text-white ${
+                  saving ? "bg-gray-300" : "bg-[#16a085] hover:bg-[#13856d]"
+                }`}
+              >
                 {saving ? "Saving…" : "Save"}
               </button>
             </div>
@@ -548,8 +635,13 @@ export default function ProfilePage() {
       )}
 
       <style jsx>{`
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
       `}</style>
     </div>
   );
