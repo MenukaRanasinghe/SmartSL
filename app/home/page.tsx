@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/src/firebase/config";
 import { User, onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import ProtectedRoute from "@/src/components/ProtectedRoute";
 
 interface Place {
   id: string;
@@ -24,6 +25,14 @@ const NEAREST_CITY_ALIAS: Record<string, string[]> = {
 
 export default function HomePage() {
   const router = useRouter();
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) router.replace("/login");
+    });
+
+    return () => unsub();
+  }, [router]);
 
   const [location, setLocation] = useState("Colombo District");
   const [places, setPlaces] = useState<Place[]>([]);
@@ -602,6 +611,7 @@ export default function HomePage() {
 
 
   return (
+    <ProtectedRoute>
     <div className="min-h-screen bg-gray-50 p-6 pb-24">
       <h1 className="text-xl font-bold text-[#16a085] mb-3">Discover Places</h1>
 
@@ -897,5 +907,7 @@ export default function HomePage() {
         }
       `}</style>
     </div>
+    </ProtectedRoute>
   );
+  
 }

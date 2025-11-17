@@ -4,8 +4,6 @@ import { MapPin, User, Home, Compass, UserCircle, LogOut, X } from "lucide-react
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { signOut } from "firebase/auth";
-import { auth } from "../../src/firebase/config";
 
 const tabs = [
   { name: "Home", path: "/home", icon: <Home className="w-5 h-5" /> },
@@ -26,6 +24,7 @@ export default function Navbar() {
       setLocation("Geolocation not supported");
       return;
     }
+
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
@@ -34,12 +33,14 @@ export default function Navbar() {
             `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
           );
           const data = await res.json();
+
           const city =
             data?.address?.city ||
             data?.address?.town ||
             data?.address?.village ||
             data?.address?.state ||
             "Unknown location";
+
           setLocation(city);
         } catch {
           setLocation("Location unavailable");
@@ -52,8 +53,14 @@ export default function Navbar() {
   const confirmLogout = async () => {
     try {
       setLoggingOut(true);
-      await signOut(auth).catch(() => {}); 
-      router.push("/login"); 
+
+      await fetch("/api/logout", {
+        method: "POST",
+      });
+
+      router.replace("/login");
+    } catch (err) {
+      console.error("Logout error:", err);
     } finally {
       setLoggingOut(false);
       setShowLogout(false);
@@ -121,7 +128,9 @@ export default function Navbar() {
             </div>
 
             <div className="px-4 py-4">
-              <p className="text-sm text-gray-700">Are you sure you want to log out?</p>
+              <p className="text-sm text-gray-700">
+                Are you sure you want to log out?
+              </p>
             </div>
 
             <div className="flex items-center justify-end gap-2 px-4 pb-4">
@@ -132,6 +141,7 @@ export default function Navbar() {
               >
                 Cancel
               </button>
+
               <button
                 onClick={confirmLogout}
                 className={`px-4 py-2 rounded-md text-white text-sm ${
