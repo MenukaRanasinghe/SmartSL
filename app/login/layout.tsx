@@ -1,18 +1,15 @@
-"use client";
+import ClientLayoutWrapper from "../ClientLayoutWrapper";
 
-import Navbar from "@/src/components/Navbar";
-import { usePathname } from "next/navigation";
-
+export const metadata = {
+  title: "CrowdPlaces",
+  description: "Discover places easily",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const hideLayout = ["/login", "/register"].includes(pathname);
-
   return (
     <html lang="en">
       <body>
-        {!hideLayout && <Navbar />}
-        {children}
+        <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
       </body>
     </html>
   );
