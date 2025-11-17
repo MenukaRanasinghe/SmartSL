@@ -1,23 +1,22 @@
-import { initializeApp, getApps, cert, ServiceAccount } from "firebase-admin/app";
-import { getDatabase, ServerValue } from "firebase-admin/database";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getDatabase, ServerValue } from "firebase-admin/database";
 
-let privateKey = (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+let privateKey = process.env.FIREBASE_PRIVATE_KEY || "";
+privateKey = privateKey.replace(/\\n/g, "\n");
 
-const serviceAccount: ServiceAccount = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  privateKey,
+const serviceAccount = {
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  private_key: privateKey,
 };
 
 const app =
   getApps().length > 0
     ? getApps()[0]
     : initializeApp({
-        credential: cert(serviceAccount),
-        databaseURL:
-          process.env.FIREBASE_DB_URL ??
-          "https://smartsl-794e8-default-rtdb.asia-southeast1.firebasedatabase.app",
+        credential: cert(serviceAccount as any),
+        databaseURL: process.env.FIREBASE_DB_URL,
       });
 
 export const adminDb = getFirestore(app);
