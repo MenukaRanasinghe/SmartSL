@@ -1,7 +1,7 @@
 import ClientLayoutWrapper from "../ClientLayoutWrapper";
 
 export const metadata = {
-  title: "CrowdPlaces",
+  title: "SmartSL",
   description: "Discover places easily",
 };
 
