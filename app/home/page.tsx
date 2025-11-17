@@ -32,6 +32,55 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [preferences, setPreferences] = useState<string[]>([]);
+
+  const PREFERENCE_TAGS: Record<string, { key: string; values: string[] }> = {
+    "historical sites": {
+      key: "historic",
+      values: ["castle", "fort", "monument", "memorial", "archaeological_site"],
+    },
+
+    "natural spots": {
+      key: "natural",
+      values: ["waterfall", "wood", "beach", "cliff", "grassland", "wetland"],
+    },
+
+    "cultural events": {
+      key: "amenity",
+      values: ["theatre", "arts_centre", "community_centre", "cinema"],
+    },
+
+    "religious sites": {
+      key: "amenity",
+      values: ["place_of_worship"],
+    },
+
+    "local food spots": {
+      key: "amenity",
+      values: ["restaurant", "cafe", "fast_food", "food_court"],
+    },
+  };
+
+
+
+  function scorePlace(p: Place, preferredTags: string[]) {
+    let score = 0;
+
+    score += 5;
+
+    const busyScore: Record<string, number> = {
+      Quiet: 1,
+      Moderate: 3,
+      Busy: 2,
+      "Very Busy": 0,
+      "": 2,
+    };
+
+    score += busyScore[p.busyLevel || ""] ?? 0;
+
+    return score;
+  }
+
 
   const [detectedCity, setDetectedCity] = useState<{
     name: string;
@@ -145,11 +194,20 @@ export default function HomePage() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) await signInAnonymously(auth);
-      else setUser(u);
+      if (!u) {
+        await signInAnonymously(auth);
+      } else {
+        setUser(u);
+
+        const res = await fetch(`/api/profile?uid=${u.uid}`);
+        const data = await res.json();
+
+        setPreferences(data?.preferences || []);
+      }
     });
     return () => unsub();
   }, []);
+
 
 
   const fetchWikidataImageByCoords = async (lat: number, lon: number): Promise<string | null> => {
@@ -184,6 +242,72 @@ export default function HomePage() {
       return null;
     }
   };
+
+  async function fetchPlacesForPreferences(
+    lat: number,
+    lon: number,
+    prefs: string[]
+  ): Promise<Place[]> {
+    try {
+      if (!prefs.length) return [];
+
+      const queries = prefs
+        .map((pref) => {
+          const prefMap = PREFERENCE_TAGS[pref];
+          if (!prefMap) return "";
+
+          const valueFilters = prefMap.values
+            .map((v) => `node["${prefMap.key}"="${v}"](around:20000,${lat},${lon});`)
+            .join("\n");
+
+          return valueFilters;
+        })
+        .filter(Boolean)
+        .join("\n");
+
+      if (!queries) return [];
+
+      const fullQuery = `
+      [out:json][timeout:30];
+      (
+        ${queries}
+      );
+      out center tags;
+    `;
+
+      const res = await fetch("https://overpass-api.de/api/interpreter", {
+        method: "POST",
+        body: fullQuery,
+        headers: { "Content-Type": "text/plain" },
+      });
+
+      const json = await res.json();
+
+      const resultElements = json?.elements || [];
+
+      const results: Place[] = await Promise.all(
+        resultElements
+          .filter((el: any) => el.tags?.name)
+          .map(async (el: any) => {
+            const img = await fetchPlaceImageByName(el.tags.name);
+            return {
+              id: el.id,
+              name: el.tags.name,
+              lat: el.lat || el.center?.lat,
+              lon: el.lon || el.center?.lon,
+              image: img,
+              description: el.tags?.description || "",
+            } as Place;
+          })
+      );
+
+      return results;
+    } catch (err) {
+      console.error("Preference fetch error:", err);
+      return []; 
+    }
+  }
+
 
   const fetchWikipediaGeoImage = async (lat: number, lon: number): Promise<any | null> => {
     try {
@@ -291,6 +415,42 @@ export default function HomePage() {
             "Nearby City";
 
           const img = await fetchImageByCoordsFirst(latitude, longitude, cityName, addr);
+
+          if (preferences.length > 0) {
+            let prefResults = await fetchPlacesForPreferences(latitude, longitude, preferences);
+            prefResults = prefResults.filter((p) => {
+              const keywords = preferences.flatMap((pref) =>
+                PREFERENCE_TAGS[pref]?.values || []
+              );
+
+              const name = p.name.toLowerCase();
+              return keywords.some((kw) => name.includes(kw));
+            });
+
+            if (prefResults.length === 0) {
+              prefResults = await fetchPlacesForPreferences(latitude, longitude, preferences);
+            }
+
+            const busyRank: Record<string, number> = {
+              Quiet: 3,
+              Moderate: 4,
+              Busy: 2,
+              "Very Busy": 1,
+              "": 2,
+            };
+
+            prefResults.sort((a, b) => {
+              const aScore = busyRank[a.busyLevel || ""] || 0;
+              const bScore = busyRank[b.busyLevel || ""] || 0;
+              return bScore - aScore; 
+            });
+
+            if (prefResults.length > 0) {
+              setPlaces(prefResults);
+              setLocation("Your Preferences");
+              return;
+            }
+          }
 
           setDetectedCity({
             name: cityName,
@@ -528,11 +688,11 @@ export default function HomePage() {
                 {detectedCity.busyLevel && (
                   <span
                     className={`ml-2 text-[10px] px-2 py-0.5 rounded-full border ${{
-                        Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
-                        Moderate: "bg-sky-50 border-sky-200 text-sky-700",
-                        Busy: "bg-amber-50 border-amber-200 text-amber-700",
-                        "Very Busy": "bg-rose-50 border-rose-200 text-rose-700",
-                      }[detectedCity.busyLevel]
+                      Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
+                      Moderate: "bg-sky-50 border-sky-200 text-sky-700",
+                      Busy: "bg-amber-50 border-amber-200 text-amber-700",
+                      "Very Busy": "bg-rose-50 border-rose-200 text-rose-700",
+                    }[detectedCity.busyLevel]
                       }`}
                   >
                     {detectedCity.busyLevel}
@@ -645,11 +805,11 @@ export default function HomePage() {
                     key={lvl}
                     onClick={() => setDetectedBusy(lvl)}
                     className={`px-3 py-2 rounded-lg border text-sm ${{
-                        Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
-                        Moderate: "bg-sky-50 border-sky-200 text-sky-700",
-                        Busy: "bg-amber-50 border-amber-200 text-amber-700",
-                        "Very Busy": "bg-rose-50 border-rose-200 text-rose-700",
-                      }[lvl]
+                      Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
+                      Moderate: "bg-sky-50 border-sky-200 text-sky-700",
+                      Busy: "bg-amber-50 border-amber-200 text-amber-700",
+                      "Very Busy": "bg-rose-50 border-rose-200 text-rose-700",
+                    }[lvl]
                       } ${isActive ? "ring-2 ring-[#16a085]" : ""}`}
                   >
                     {lvl}
@@ -716,8 +876,8 @@ export default function HomePage() {
                   }
                 }}
                 className={`px-4 py-2 rounded-md text-white ${detectedBusy
-                    ? "bg-[#16a085] hover:bg-[#13856d]"
-                    : "bg-gray-300 cursor-not-allowed"
+                  ? "bg-[#16a085] hover:bg-[#13856d]"
+                  : "bg-gray-300 cursor-not-allowed"
                   }`}
               >
                 Continue
