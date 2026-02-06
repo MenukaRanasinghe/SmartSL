@@ -1,37 +1,32 @@
-import { NextResponse } from "next/server";
-import * as admin from "firebase-admin";
+// src/firebase/admin.ts
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
+import { getDatabase, ServerValue } from "firebase-admin/database";
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FB_PROJECT_ID,
-      clientEmail: process.env.FB_CLIENT_EMAIL,
-      privateKey: process.env.FB_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
+const privateKey = (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+
+const serviceAccount = {
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  privateKey,
+};
+
+if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
+  throw new Error(
+    "Missing Firebase Admin env vars: FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY"
+  );
 }
 
-export async function POST(req: Request) {
-  try {
-    const { token } = await req.json();
-
-    const decoded = await admin.auth().verifyIdToken(token);
-    if (!decoded) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-
-    const session = await admin.auth().createSessionCookie(token, {
-      expiresIn: 60 * 60 * 24 * 5 * 1000, 
+const app =
+  getApps().length > 0
+    ? getApps()[0]
+    : initializeApp({
+      credential: cert(serviceAccount as any),
+      databaseURL: process.env.FIREBASE_DB_URL,
     });
 
-    const response = NextResponse.json({ success: true });
-    response.cookies.set("session", session, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "strict",
-      path: "/",
-    });
-
-    return response;
-  } catch (e) {
-    return NextResponse.json({ error: "Session failed" }, { status: 500 });
-  }
-}
+export const adminAuth = getAuth(app);
+export const adminDb = getFirestore(app);
+export const adminRtdb = getDatabase(app);
+export const RTDBServerTime = ServerValue.TIMESTAMP;
