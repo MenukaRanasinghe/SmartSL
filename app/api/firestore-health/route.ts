@@ -1,22 +1,23 @@
 import { NextResponse } from "next/server";
-import { getFirestore } from "firebase-admin/firestore";
+import { adminDb } from "@/src/firebase/admin";
 
 export const runtime = "nodejs";
 
-const adminFirestore = getFirestore();
-
 export async function GET() {
   try {
-    await adminFirestore
-      .collection("health")
-      .doc("_ping")
-      .set({ at: new Date() }, { merge: true });
+    const db = adminDb();
+
+    await db.collection("health").doc("_ping").set(
+      { at: new Date() },
+      { merge: true }
+    );
 
     return NextResponse.json({
       ok: true,
-      projectId: process.env.FIREBASE_PROJECT_ID,
+      projectId: process.env.FIREBASE_PROJECT_ID || null,
     });
   } catch (e: any) {
+    console.error("firestore-health error:", e?.message || e);
     return NextResponse.json(
       { ok: false, error: e?.message || String(e) },
       { status: 500 }

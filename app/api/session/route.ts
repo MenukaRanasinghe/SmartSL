@@ -11,9 +11,9 @@ export async function POST(req: Request) {
     if (!token || typeof token !== "string") {
       return NextResponse.json({ error: "Missing token" }, { status: 400 });
     }
-    const decoded = await adminAuth.verifyIdToken(token);
+    const decoded = await adminAuth().verifyIdToken(token);
 
-    const sessionCookie = await adminAuth.createSessionCookie(token, {
+    const sessionCookie = await adminAuth().createSessionCookie(token, {
       expiresIn: 5 * 24 * 60 * 60 * 1000,
     });
 
