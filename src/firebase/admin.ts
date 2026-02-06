@@ -1,31 +1,35 @@
-// src/firebase/admin.ts
-import { initializeApp, getApps, cert, getApp } from "firebase-admin/app";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getDatabase, ServerValue } from "firebase-admin/database";
 
-function ensureAdminApp() {
-  // Reuse existing app (important for hot reload + serverless)
-  if (getApps().length) return getApp();
+function loadServiceAccount() {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!raw) throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_JSON");
 
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+  const sa = JSON.parse(raw);
 
-  // Validate when we attempt to init (clear error message)
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      "Missing Firebase Admin env vars: FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY"
-    );
+  sa.private_key = (sa.private_key || "").replace(/\\n/g, "\n");
+
+  if (!sa.project_id || !sa.client_email || !sa.private_key) {
+    throw new Error("Service account JSON missing project_id/client_email/private_key");
+  }
+  if (!String(sa.private_key).includes("BEGIN PRIVATE KEY")) {
+    throw new Error("private_key is not a PEM key");
   }
 
-  return initializeApp({
-    credential: cert({ projectId, clientEmail, privateKey } as any),
-    databaseURL: process.env.FIREBASE_DB_URL,
-  });
+  return sa;
 }
 
-const app = ensureAdminApp();
+const serviceAccount = loadServiceAccount();
+
+const app =
+  getApps().length > 0
+    ? getApps()[0]
+    : initializeApp({
+      credential: cert(serviceAccount),
+      databaseURL: process.env.FIREBASE_DB_URL,
+    });
 
 export const adminAuth = getAuth(app);
 export const adminDb = getFirestore(app);

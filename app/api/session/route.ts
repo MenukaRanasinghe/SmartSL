@@ -5,28 +5,32 @@ export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
-    const { token } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const token = body?.token;
 
-    const decoded = await adminAuth.verifyIdToken(token);
-    if (!decoded) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    if (!token || typeof token !== "string") {
+      return NextResponse.json({ error: "Missing token" }, { status: 400 });
     }
+    const decoded = await adminAuth.verifyIdToken(token);
 
-    const session = await adminAuth.createSessionCookie(token, {
-      expiresIn: 60 * 60 * 24 * 5 * 1000, // 5 days
+    const sessionCookie = await adminAuth.createSessionCookie(token, {
+      expiresIn: 5 * 24 * 60 * 60 * 1000,
     });
 
-    const res = NextResponse.json({ success: true });
-    res.cookies.set("session", session, {
+    const res = NextResponse.json({ success: true, uid: decoded.uid });
+    res.cookies.set("session", sessionCookie, {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 24 * 5, // 5 days (seconds)
+      maxAge: 5 * 24 * 60 * 60,
     });
 
     return res;
   } catch (e: any) {
+    console.error("SESSION ERROR:", e?.message || e);
+    if (e?.errorInfo) console.error("SESSION ERROR INFO:", e.errorInfo);
+
     return NextResponse.json(
       { error: e?.message || "Session failed" },
       { status: 500 }

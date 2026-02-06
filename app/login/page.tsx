@@ -13,25 +13,33 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError("");
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
 
-  try {
-    const user = await signInWithEmailAndPassword(auth, email, password);
-    const token = await user.user.getIdToken();
+    try {
+      const user = await signInWithEmailAndPassword(auth, email, password);
+      const token = await user.user.getIdToken();
 
-    await fetch("/api/session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    });
+      const r = await fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
 
-    router.push("/home");
-  } catch (err) {
-    setError("Invalid email or password");
-  }
-};
+      const j = await r.json().catch(() => ({}));
+
+      if (!r.ok) {
+        setError(j?.error || `Session failed (${r.status})`);
+        return;
+      }
+
+      router.push("/home");
+    } catch (err: any) {
+      setError(err?.message || "Login failed");
+    }
+  };
+
   return (
     <div className="min-h-[100dvh] flex items-center justify-center bg-gray-900 text-white">
       <div className="bg-gray-800 p-8 rounded-2xl w-[400px] shadow-lg">
