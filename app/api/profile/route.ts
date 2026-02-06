@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminRtdb, RTDBServerTime } from "@/src/firebase/admin";
+import { getAdminRtdb, RTDBServerTime } from "@/src/firebase/admin";
 
 export const runtime = "nodejs";
 
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       cleanPrefs = preferences.filter((p: string) => allowed.has(p));
     }
 
-    const baseRef = adminRtdb().ref(`/profile/${uid}`);
+    const baseRef = getAdminRtdb().ref(`/profile/${uid}`);
     const existingSnap = await baseRef.get();
     const existing = existingSnap.val() || {};
 
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       };
     }
 
-    await adminRtdb().ref().update(updates);
+    await getAdminRtdb().ref().update(updates);
 
     return NextResponse.json({ ok: true, store: "rtdb" });
   } catch (err: any) {
@@ -70,19 +70,19 @@ export async function GET(req: Request) {
     let data: any = null;
 
     if (email) {
-      const idxSnap = await adminRtdb()
+      const idxSnap = await getAdminRtdb()
         .ref(`/profileByEmail/${emailKey(email)}`)
         .get();
 
       const idx = idxSnap.val();
       if (idx?.uid) {
-        const docSnap = await adminRtdb().ref(`/profile/${idx.uid}`).get();
+        const docSnap = await getAdminRtdb().ref(`/profile/${idx.uid}`).get();
         data = docSnap.val();
       }
     }
 
     if (!data && uid) {
-      const docSnap = await adminRtdb().ref(`/profile/${uid}`).get();
+      const docSnap = await getAdminRtdb().ref(`/profile/${uid}`).get();
       data = docSnap.val();
     }
 
