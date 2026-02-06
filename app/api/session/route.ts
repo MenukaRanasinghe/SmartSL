@@ -7,13 +7,13 @@ export async function POST(req: Request) {
   try {
     const { token } = await req.json();
 
-    const decoded = await adminAuth().verifyIdToken(token);
+    const decoded = await adminAuth.verifyIdToken(token);
     if (!decoded) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
-    const session = await adminAuth().createSessionCookie(token, {
-      expiresIn: 60 * 60 * 24 * 5 * 1000,
+    const session = await adminAuth.createSessionCookie(token, {
+      expiresIn: 60 * 60 * 24 * 5 * 1000, // 5 days
     });
 
     const res = NextResponse.json({ success: true });
@@ -22,11 +22,14 @@ export async function POST(req: Request) {
       secure: true,
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 24 * 5,
+      maxAge: 60 * 60 * 24 * 5, // 5 days (seconds)
     });
 
     return res;
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Session failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: e?.message || "Session failed" },
+      { status: 500 }
+    );
   }
 }

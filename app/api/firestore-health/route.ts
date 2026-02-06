@@ -5,10 +5,10 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    await adminDb().collection("health").doc("_ping").set(
-      { at: new Date() },
-      { merge: true }
-    );
+    await adminDb
+      .collection("health")
+      .doc("_ping")
+      .set({ at: new Date() }, { merge: true });
 
     return NextResponse.json({
       ok: true,

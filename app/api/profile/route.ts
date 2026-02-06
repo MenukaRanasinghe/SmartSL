@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminRtdb, RTDBServerTime } from "../../../src/firebase/admin";
+import { adminRtdb, RTDBServerTime } from "@/src/firebase/admin";
 
 export const runtime = "nodejs";
 
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     const updates: Record<string, any> = {};
 
     updates[`/profile/${uid}`] = {
-      ...existing, 
+      ...existing,
       ...(cleanPrefs.length ? { preferences: cleanPrefs } : {}),
       ...(email ? { email } : {}),
       ...(lastLocation ? { lastLocation } : {}),
@@ -54,7 +54,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, store: "rtdb" });
   } catch (err: any) {
     console.error("API save error:", err);
-    return NextResponse.json({ error: err?.message || "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || "Server error" },
+      { status: 500 }
+    );
   }
 }
 
@@ -67,7 +70,10 @@ export async function GET(req: Request) {
     let data: any = null;
 
     if (email) {
-      const idxSnap = await adminRtdb.ref(`/profileByEmail/${emailKey(email)}`).get();
+      const idxSnap = await adminRtdb
+        .ref(`/profileByEmail/${emailKey(email)}`)
+        .get();
+
       const idx = idxSnap.val();
       if (idx?.uid) {
         const docSnap = await adminRtdb.ref(`/profile/${idx.uid}`).get();
@@ -86,6 +92,9 @@ export async function GET(req: Request) {
       email: data?.email || null,
     });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: e?.message || "Server error" },
+      { status: 500 }
+    );
   }
 }
