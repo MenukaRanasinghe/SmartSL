@@ -1,32 +1,32 @@
-// src/firebase/admin.ts
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
-import { getDatabase, ServerValue } from "firebase-admin/database";
+import { NextResponse } from "next/server";
+import { adminAuth } from "@/src/firebase/admin";
 
-const privateKey = (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
+export const runtime = "nodejs";
 
-const serviceAccount = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  privateKey,
-};
+export async function POST(req: Request) {
+  try {
+    const { token } = await req.json();
 
-if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
-  throw new Error(
-    "Missing Firebase Admin env vars: FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY"
-  );
-}
+    const decoded = await adminAuth().verifyIdToken(token);
+    if (!decoded) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    }
 
-const app =
-  getApps().length > 0
-    ? getApps()[0]
-    : initializeApp({
-      credential: cert(serviceAccount as any),
-      databaseURL: process.env.FIREBASE_DB_URL,
+    const session = await adminAuth().createSessionCookie(token, {
+      expiresIn: 60 * 60 * 24 * 5 * 1000,
     });
 
-export const adminAuth = getAuth(app);
-export const adminDb = getFirestore(app);
-export const adminRtdb = getDatabase(app);
-export const RTDBServerTime = ServerValue.TIMESTAMP;
+    const res = NextResponse.json({ success: true });
+    res.cookies.set("session", session, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 5,
+    });
+
+    return res;
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Session failed" }, { status: 500 });
+  }
+}
