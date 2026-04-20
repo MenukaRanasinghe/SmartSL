@@ -16,9 +16,10 @@ interface Place {
   description?: string;
   busyLevel?: string;
   category?: string;
-  confidence?: number; // 0-100
-  lastUpdated?: string; // ISO string
+  confidence?: number;
+  lastUpdated?: string;
   isHiddenGem?: boolean;
+  district?: string;
 }
 
 type Busy = "Quiet" | "Moderate" | "Busy" | "Very Busy" | "";
@@ -44,7 +45,344 @@ const NEAREST_CITY_ALIAS: Record<string, string[]> = {
   mampe: ["Piliyandala", "Kesbewa"],
 };
 
-// Basic Sinhala/Tamil phrases for travellers (covered in dissertation §5.2)
+// ------------------------------------------------------------------
+// DUMMY / SEED PLACES — real Sri Lankan destinations, one per category
+// so every filter tab has content even before the backend populates.
+// These are merged with live data and de-duplicated.
+// ------------------------------------------------------------------
+const SEED_PLACES: Place[] = [
+  // Historical
+  {
+    id: "seed-galle-fort",
+    name: "Galle Fort",
+    lat: 6.0257,
+    lon: 80.217,
+    category: "historical",
+    district: "Galle",
+    description: "UNESCO-listed Dutch fort with ramparts & sea views.",
+    busyLevel: "Moderate",
+    confidence: 82,
+    lastUpdated: new Date(Date.now() - 12 * 60000).toISOString(),
+  },
+  {
+    id: "seed-sigiriya",
+    name: "Sigiriya Rock",
+    lat: 7.957,
+    lon: 80.7603,
+    category: "historical",
+    district: "Dambulla",
+    description: "Ancient rock fortress with dropping panoramas.",
+    busyLevel: "Busy",
+    confidence: 88,
+    lastUpdated: new Date(Date.now() - 22 * 60000).toISOString(),
+  },
+  {
+    id: "seed-polonnaruwa",
+    name: "Polonnaruwa Ancient City",
+    lat: 7.9403,
+    lon: 81.0188,
+    category: "historical",
+    district: "Polonnaruwa",
+    description: "Ruins of Sri Lanka's medieval capital.",
+    busyLevel: "Quiet",
+    confidence: 74,
+    lastUpdated: new Date(Date.now() - 35 * 60000).toISOString(),
+  },
+  {
+    id: "seed-anuradhapura",
+    name: "Anuradhapura Sacred City",
+    lat: 8.3114,
+    lon: 80.4037,
+    category: "historical",
+    district: "Anuradhapura",
+    description: "Ancient stupas and sacred monuments.",
+    busyLevel: "Moderate",
+    confidence: 79,
+    lastUpdated: new Date(Date.now() - 48 * 60000).toISOString(),
+  },
+
+  // Religious
+  {
+    id: "seed-dalada-maligawa",
+    name: "Sri Dalada Maligawa",
+    lat: 7.2936,
+    lon: 80.6413,
+    category: "religious",
+    district: "Kandy",
+    description: "Temple of the Sacred Tooth Relic.",
+    busyLevel: "Very Busy",
+    confidence: 91,
+    lastUpdated: new Date(Date.now() - 8 * 60000).toISOString(),
+  },
+  {
+    id: "seed-gangaramaya",
+    name: "Gangaramaya Temple",
+    lat: 6.9167,
+    lon: 79.8566,
+    category: "religious",
+    district: "Colombo",
+    description: "Colombo's eclectic Buddhist temple & museum.",
+    busyLevel: "Busy",
+    confidence: 85,
+    lastUpdated: new Date(Date.now() - 15 * 60000).toISOString(),
+  },
+  {
+    id: "seed-cave-temple",
+    name: "Dambulla Cave Temple",
+    lat: 7.8567,
+    lon: 80.6492,
+    category: "religious",
+    district: "Dambulla",
+    description: "Rock cave temples with Buddha statues & murals.",
+    busyLevel: "Moderate",
+    confidence: 80,
+    lastUpdated: new Date(Date.now() - 27 * 60000).toISOString(),
+  },
+  {
+    id: "seed-kelaniya",
+    name: "Kelaniya Raja Maha Vihara",
+    lat: 6.9553,
+    lon: 79.9219,
+    category: "religious",
+    district: "Colombo",
+    description: "Historic Buddhist temple with fine murals.",
+    busyLevel: "Quiet",
+    confidence: 72,
+    lastUpdated: new Date(Date.now() - 55 * 60000).toISOString(),
+  },
+
+  // Natural
+  {
+    id: "seed-ella-nine-arch",
+    name: "Nine Arch Bridge",
+    lat: 6.8764,
+    lon: 81.0586,
+    category: "natural",
+    district: "Ella",
+    description: "Iconic colonial railway bridge in the hills.",
+    busyLevel: "Busy",
+    confidence: 84,
+    lastUpdated: new Date(Date.now() - 18 * 60000).toISOString(),
+  },
+  {
+    id: "seed-horton-plains",
+    name: "Horton Plains",
+    lat: 6.8096,
+    lon: 80.8,
+    category: "natural",
+    district: "Nuwara Eliya",
+    description: "Highland plateau with World's End cliff.",
+    busyLevel: "Quiet",
+    confidence: 77,
+    lastUpdated: new Date(Date.now() - 42 * 60000).toISOString(),
+  },
+  {
+    id: "seed-mirissa",
+    name: "Mirissa Beach",
+    lat: 5.9483,
+    lon: 80.4589,
+    category: "natural",
+    district: "Matara",
+    description: "Crescent beach famed for whale watching.",
+    busyLevel: "Moderate",
+    confidence: 81,
+    lastUpdated: new Date(Date.now() - 20 * 60000).toISOString(),
+  },
+  {
+    id: "seed-devon-falls",
+    name: "Devon Falls",
+    lat: 6.9575,
+    lon: 80.6,
+    category: "natural",
+    district: "Nuwara Eliya",
+    description: "97m waterfall surrounded by tea country.",
+    busyLevel: "Quiet",
+    confidence: 70,
+    lastUpdated: new Date(Date.now() - 65 * 60000).toISOString(),
+  },
+
+  // Food & Markets
+  {
+    id: "seed-pettah-market",
+    name: "Pettah Market",
+    lat: 6.9391,
+    lon: 79.8566,
+    category: "food",
+    district: "Colombo",
+    description: "Bustling bazaar of spices, produce and street food.",
+    busyLevel: "Very Busy",
+    confidence: 89,
+    lastUpdated: new Date(Date.now() - 6 * 60000).toISOString(),
+  },
+  {
+    id: "seed-good-market",
+    name: "Good Market Colombo",
+    lat: 6.9097,
+    lon: 79.8636,
+    category: "food",
+    district: "Colombo",
+    description: "Weekend farmers' market with Sri Lankan artisan foods.",
+    busyLevel: "Moderate",
+    confidence: 76,
+    lastUpdated: new Date(Date.now() - 25 * 60000).toISOString(),
+  },
+  {
+    id: "seed-galle-fort-food",
+    name: "Galle Fort Food Lane",
+    lat: 6.0268,
+    lon: 80.2171,
+    category: "food",
+    district: "Galle",
+    description: "Seafood cafés and Dutch-era eateries.",
+    busyLevel: "Busy",
+    confidence: 83,
+    lastUpdated: new Date(Date.now() - 14 * 60000).toISOString(),
+  },
+  {
+    id: "seed-nuwara-eliya-market",
+    name: "Nuwara Eliya Central Market",
+    lat: 6.9497,
+    lon: 80.7891,
+    category: "food",
+    district: "Nuwara Eliya",
+    description: "Tea, cheese, and hill-country produce.",
+    busyLevel: "Quiet",
+    confidence: 71,
+    lastUpdated: new Date(Date.now() - 50 * 60000).toISOString(),
+  },
+
+  // Cultural Events / Festivals
+  {
+    id: "seed-navam-perahera",
+    name: "Navam Perahera",
+    lat: 6.9167,
+    lon: 79.8566,
+    category: "events",
+    district: "Colombo",
+    description: "Annual February procession of Gangaramaya Temple.",
+    busyLevel: "Very Busy",
+    confidence: 92,
+    lastUpdated: new Date(Date.now() - 9 * 60000).toISOString(),
+  },
+  {
+    id: "seed-kandy-esala",
+    name: "Kandy Esala Perahera",
+    lat: 7.2936,
+    lon: 80.6413,
+    category: "events",
+    district: "Kandy",
+    description: "Ten-day cultural procession (July/August).",
+    busyLevel: "Very Busy",
+    confidence: 95,
+    lastUpdated: new Date(Date.now() - 4 * 60000).toISOString(),
+  },
+  {
+    id: "seed-galle-literary",
+    name: "Galle Literary Festival",
+    lat: 6.0257,
+    lon: 80.217,
+    category: "events",
+    district: "Galle",
+    description: "January festival within the historic fort.",
+    busyLevel: "Busy",
+    confidence: 78,
+    lastUpdated: new Date(Date.now() - 33 * 60000).toISOString(),
+  },
+  {
+    id: "seed-kandy-cultural-show",
+    name: "Kandy Cultural Show",
+    lat: 7.2906,
+    lon: 80.6337,
+    category: "events",
+    district: "Kandy",
+    description: "Nightly dance & drumming performances.",
+    busyLevel: "Moderate",
+    confidence: 75,
+    lastUpdated: new Date(Date.now() - 28 * 60000).toISOString(),
+  },
+
+  // Hidden Gems
+  {
+    id: "seed-pidurangala",
+    name: "Pidurangala Rock",
+    lat: 7.9625,
+    lon: 80.7614,
+    category: "natural",
+    district: "Dambulla",
+    description: "Quieter climb across from Sigiriya with the best view of the rock.",
+    busyLevel: "Quiet",
+    confidence: 73,
+    lastUpdated: new Date(Date.now() - 40 * 60000).toISOString(),
+    isHiddenGem: true,
+  },
+  {
+    id: "seed-sembuwatta",
+    name: "Sembuwatta Lake",
+    lat: 7.2997,
+    lon: 80.7719,
+    category: "natural",
+    district: "Matale",
+    description: "Emerald man-made lake tucked in the hills.",
+    busyLevel: "Quiet",
+    confidence: 68,
+    lastUpdated: new Date(Date.now() - 90 * 60000).toISOString(),
+    isHiddenGem: true,
+  },
+  {
+    id: "seed-hiriketiya",
+    name: "Hiriketiya Bay",
+    lat: 5.967,
+    lon: 80.6247,
+    category: "natural",
+    district: "Dikwella",
+    description: "Horseshoe-shaped surf bay, still low-key.",
+    busyLevel: "Moderate",
+    confidence: 74,
+    lastUpdated: new Date(Date.now() - 21 * 60000).toISOString(),
+    isHiddenGem: true,
+  },
+  {
+    id: "seed-belihuloya",
+    name: "Belihuloya Forest",
+    lat: 6.7547,
+    lon: 80.7747,
+    category: "natural",
+    district: "Ratnapura",
+    description: "Cool riverine trails between the hills and lowlands.",
+    busyLevel: "Quiet",
+    confidence: 66,
+    lastUpdated: new Date(Date.now() - 120 * 60000).toISOString(),
+    isHiddenGem: true,
+  },
+  {
+    id: "seed-popham",
+    name: "Popham's Arboretum",
+    lat: 7.855,
+    lon: 80.653,
+    category: "natural",
+    district: "Dambulla",
+    description: "Dry-zone forest arboretum for wildlife walks.",
+    busyLevel: "Quiet",
+    confidence: 67,
+    lastUpdated: new Date(Date.now() - 75 * 60000).toISOString(),
+    isHiddenGem: true,
+  },
+  {
+    id: "seed-sahas-uyana",
+    name: "Sahas Uyana",
+    lat: 7.2906,
+    lon: 80.635,
+    category: "natural",
+    district: "Kandy",
+    description: "Calm gardens above Kandy with a lookout.",
+    busyLevel: "Quiet",
+    confidence: 70,
+    lastUpdated: new Date(Date.now() - 60 * 60000).toISOString(),
+    isHiddenGem: true,
+  },
+];
+
+// Basic Sinhala/Tamil phrases for travellers (dissertation §5.2)
 const LANGUAGE_PHRASES: {
   english: string;
   sinhala: string;
@@ -77,12 +415,11 @@ export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
   const [preferences, setPreferences] = useState<string[]>([]);
 
-  // ---------- New UI state (features from dissertation) ----------
+  // UI state for new features
   const [activeCategory, setActiveCategory] = useState<CategoryKey>("all");
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLanguageHelp, setShowLanguageHelp] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  // ----------------------------------------------------------------
 
   const PREFERENCE_TAGS: Record<string, { key: string; values: string[] }> = {
     "historical sites": {
@@ -107,16 +444,15 @@ export default function HomePage() {
     },
   };
 
-  // Categorise a place for the filter chips (best-effort from name)
   const inferCategory = (p: Place): string => {
     if (p.category) return p.category;
     const n = (p.name || "").toLowerCase();
-    if (/(temple|kovil|church|mosque|vihara|dagoba|stupa)/.test(n)) return "religious";
-    if (/(fort|museum|heritage|ruin|palace|monument|archae)/.test(n)) return "historical";
-    if (/(beach|waterfall|falls|park|forest|mountain|cliff|lake|bay|lagoon)/.test(n))
+    if (/(temple|kovil|church|mosque|vihara|dagoba|stupa|maligawa)/.test(n)) return "religious";
+    if (/(fort|museum|heritage|ruin|palace|monument|archae|ancient|polonnaruwa|anuradhapura)/.test(n)) return "historical";
+    if (/(beach|waterfall|falls|park|forest|mountain|cliff|lake|bay|lagoon|rock|peak|plains)/.test(n))
       return "natural";
-    if (/(market|restaurant|cafe|food|bazaar|street)/.test(n)) return "food";
-    if (/(festival|parade|event|show)/.test(n)) return "events";
+    if (/(market|restaurant|cafe|food|bazaar|street|lane)/.test(n)) return "food";
+    if (/(festival|parade|event|show|perahera)/.test(n)) return "events";
     return "other";
   };
 
@@ -158,20 +494,20 @@ export default function HomePage() {
     return Array.from(map.values());
   };
 
-  const uniquePlaces = useMemo(() => dedupe(places), [places]);
+  // Merge live places with seed places (seed fills empty categories)
+  const allPlaces = useMemo(() => dedupe([...places, ...SEED_PLACES]), [places]);
   const uniqueSearchResults = useMemo(() => dedupe(searchResults), [searchResults]);
 
-  // Apply category filter on the main suggestions list
+  // Apply category filter
   const filteredPlaces = useMemo(() => {
-    if (activeCategory === "all") return uniquePlaces;
-    if (activeCategory === "hidden") return uniquePlaces.filter((p) => p.isHiddenGem);
-    return uniquePlaces.filter((p) => inferCategory(p) === activeCategory);
-  }, [uniquePlaces, activeCategory]);
+    if (activeCategory === "all") return allPlaces;
+    if (activeCategory === "hidden") return allPlaces.filter((p) => p.isHiddenGem);
+    return allPlaces.filter((p) => inferCategory(p) === activeCategory);
+  }, [allPlaces, activeCategory]);
 
-  // Hidden gems strip (first 8 hidden gems, or places we mark as lesser-known)
   const hiddenGems = useMemo(
-    () => uniquePlaces.filter((p) => p.isHiddenGem).slice(0, 10),
-    [uniquePlaces]
+    () => allPlaces.filter((p) => p.isHiddenGem).slice(0, 10),
+    [allPlaces]
   );
 
   const buildDetectedImageQueries = (detectedName: string, addr: any): string[] => {
@@ -270,12 +606,34 @@ export default function HomePage() {
     return () => unsub();
   }, []);
 
-  // --- Fetch contextual notifications (event/festival, weather, peak/quiet alerts) ---
+  // Hydrate seed images from Wikipedia/Unsplash once
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const imgs = await Promise.all(
+        SEED_PLACES.map(async (p) =>
+          p.image ? p.image : await fetchPlaceImageByName([p.name, p.district || "Sri Lanka"])
+        )
+      );
+      if (!cancelled) {
+        // attach fetched images
+        SEED_PLACES.forEach((p, i) => {
+          if (!p.image) p.image = imgs[i];
+        });
+        // force re-render
+        setPlaces((prev) => [...prev]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Notifications
   useEffect(() => {
     const loadNotifications = async () => {
       try {
-        // Try the internal API first; fall back to a sensible default set so the UI
-        // always demonstrates the dissertation's alert features.
         const res = await fetch("/api/notifications", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
@@ -286,7 +644,6 @@ export default function HomePage() {
         }
       } catch { }
 
-      // Fallback demo alerts (aligns with dissertation §5.2 & §5.3)
       setNotifications([
         {
           id: "n1",
@@ -592,7 +949,7 @@ export default function HomePage() {
         const data: Place[] = await res.json();
 
         if (!Array.isArray(data) || data.length === 0) {
-          setError("No Colombo district places found.");
+          // don't blank out — seed data still appears
           setPlaces([]);
           return;
         }
@@ -606,7 +963,7 @@ export default function HomePage() {
 
         setPlaces(withImages);
       } catch {
-        setError("Failed to load Colombo attractions.");
+        // Silent — seed data will still render
       } finally {
         setLoading(false);
       }
@@ -709,7 +1066,6 @@ export default function HomePage() {
     [detectedCity, detectingCity]
   );
 
-  // ---------- Small presentational helpers ----------
   const busyBadgeClass = (lvl?: string) => {
     const map: Record<string, string> = {
       Quiet: "bg-emerald-50 border-emerald-200 text-emerald-700",
@@ -754,13 +1110,11 @@ export default function HomePage() {
     { key: "hidden", label: "Hidden Gems", icon: "💎" },
   ];
 
-  // First weather-or-safety notification is surfaced as a banner (dissertation: weather & safety alerts)
   const bannerAlert = useMemo(
     () => notifications.find((n) => n.type === "weather" || n.type === "safety"),
     [notifications]
   );
 
-  // First event/festival notification is shown as a chip strip
   const eventAlert = useMemo(
     () => notifications.find((n) => n.type === "event"),
     [notifications]
@@ -774,7 +1128,6 @@ export default function HomePage() {
           <h1 className="text-xl font-bold text-[#16a085]">Discover Places</h1>
 
           <div className="flex items-center gap-2">
-            {/* Language helper (Sinhalese/Tamil) */}
             <button
               onClick={() => setShowLanguageHelp(true)}
               className="p-2 rounded-full border border-gray-200 bg-white hover:bg-gray-50"
@@ -784,7 +1137,6 @@ export default function HomePage() {
               <span className="text-sm">🈁</span>
             </button>
 
-            {/* Notifications bell */}
             <button
               onClick={() => setShowNotifications(true)}
               className="relative p-2 rounded-full border border-gray-200 bg-white hover:bg-gray-50"
@@ -857,7 +1209,7 @@ export default function HomePage() {
             🧭 Crowd-aware routes
           </button>
           <button
-            onClick={() => setActiveCategory("hidden")}
+            onClick={() => router.push("/hidden-gems")}
             className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
           >
             💎 Hidden gems
@@ -927,13 +1279,13 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Hidden gems strip */}
-        {hiddenGems.length > 0 && activeCategory !== "hidden" && (
+        {/* Hidden gems strip (only visible on All tab) */}
+        {hiddenGems.length > 0 && activeCategory === "all" && (
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-lg font-semibold text-gray-700">💎 Hidden Gems</h2>
               <button
-                onClick={() => setActiveCategory("hidden")}
+                onClick={() => router.push("/hidden-gems")}
                 className="text-xs text-[#16a085] hover:underline"
               >
                 See all
@@ -1057,6 +1409,11 @@ export default function HomePage() {
                     sizes="240px"
                     className="object-cover hover:scale-105 transition-transform"
                   />
+                  {place.isHiddenGem && (
+                    <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-violet-600 text-white">
+                      Hidden Gem
+                    </span>
+                  )}
                 </div>
 
                 <div className="p-3">
@@ -1076,7 +1433,12 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  {/* Confidence + last updated (dissertation §1.1, §5.2) */}
+                  {place.district && (
+                    <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                      {place.district}
+                    </p>
+                  )}
+
                   {(typeof place.confidence === "number" || place.lastUpdated) && (
                     <div className="mt-1.5 flex items-center justify-between text-[10px] text-gray-500">
                       {typeof place.confidence === "number" && (
@@ -1105,7 +1467,7 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* ---------- Detected city modal (existing) ---------- */}
+        {/* Detected city modal */}
         {showDetectedModal && detectedCity && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-5">
@@ -1224,7 +1586,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ---------- Notifications panel ---------- */}
+        {/* Notifications panel */}
         {showNotifications && (
           <div
             className="fixed inset-0 z-50 flex items-start justify-end bg-black/40"
@@ -1281,7 +1643,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ---------- Language phrases modal ---------- */}
+        {/* Language phrases modal */}
         {showLanguageHelp && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
@@ -1292,9 +1654,7 @@ export default function HomePage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Local Phrases
-                </h3>
+                <h3 className="text-lg font-semibold text-gray-900">Local Phrases</h3>
                 <button
                   className="text-gray-500 hover:text-gray-800"
                   onClick={() => setShowLanguageHelp(false)}
