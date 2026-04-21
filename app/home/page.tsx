@@ -42,9 +42,7 @@ interface AppNotification {
 }
 
 // ------------------------------------------------------------------
-// Sri Lankan districts (for "near detected location" filter)
-// We snap the detected point to its district, then filter places
-// to the same district.
+// Sri Lankan districts
 // ------------------------------------------------------------------
 const SRI_LANKA_DISTRICTS: { name: string; lat: number; lon: number }[] = [
   { name: "Colombo", lat: 6.9271, lon: 79.8612 },
@@ -72,10 +70,9 @@ const SRI_LANKA_DISTRICTS: { name: string; lat: number; lon: number }[] = [
   { name: "Monaragala", lat: 6.8728, lon: 81.351 },
   { name: "Ratnapura", lat: 6.6828, lon: 80.4036 },
   { name: "Kegalle", lat: 7.2513, lon: 80.3464 },
-  { name: "Dambulla", lat: 7.857, lon: 80.651 }, // not a district but useful bucket
+  { name: "Dambulla", lat: 7.857, lon: 80.651 },
 ];
 
-// Haversine distance in km
 function distanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -102,421 +99,63 @@ function findNearestDistrict(lat: number, lon: number): string {
 }
 
 // ------------------------------------------------------------------
-// DUMMY / SEED PLACES — real Sri Lankan destinations, one per category
-// so every filter tab has content even before the backend populates.
+// SEED PLACES
 // ------------------------------------------------------------------
 const SEED_PLACES: Place[] = [
-  // Historical
-  {
-    id: "seed-galle-fort",
-    name: "Galle Fort",
-    lat: 6.0257,
-    lon: 80.217,
-    category: "historical",
-    district: "Galle",
-    description: "UNESCO-listed Dutch fort with ramparts & sea views.",
-    busyLevel: "Moderate",
-    confidence: 82,
-    lastUpdated: new Date(Date.now() - 12 * 60000).toISOString(),
-  },
-  {
-    id: "seed-sigiriya",
-    name: "Sigiriya Rock",
-    lat: 7.957,
-    lon: 80.7603,
-    category: "historical",
-    district: "Dambulla",
-    description: "Ancient rock fortress with dropping panoramas.",
-    busyLevel: "Busy",
-    confidence: 88,
-    lastUpdated: new Date(Date.now() - 22 * 60000).toISOString(),
-  },
-  {
-    id: "seed-polonnaruwa",
-    name: "Polonnaruwa Ancient City",
-    lat: 7.9403,
-    lon: 81.0188,
-    category: "historical",
-    district: "Polonnaruwa",
-    description: "Ruins of Sri Lanka's medieval capital.",
-    busyLevel: "Quiet",
-    confidence: 74,
-    lastUpdated: new Date(Date.now() - 35 * 60000).toISOString(),
-  },
-  {
-    id: "seed-anuradhapura",
-    name: "Anuradhapura Sacred City",
-    lat: 8.3114,
-    lon: 80.4037,
-    category: "historical",
-    district: "Anuradhapura",
-    description: "Ancient stupas and sacred monuments.",
-    busyLevel: "Moderate",
-    confidence: 79,
-    lastUpdated: new Date(Date.now() - 48 * 60000).toISOString(),
-  },
+  { id: "seed-galle-fort", name: "Galle Fort", lat: 6.0257, lon: 80.217, category: "historical", district: "Galle", description: "UNESCO-listed Dutch fort with ramparts & sea views.", busyLevel: "Moderate", confidence: 82, lastUpdated: new Date(Date.now() - 12 * 60000).toISOString() },
+  { id: "seed-sigiriya", name: "Sigiriya Rock", lat: 7.957, lon: 80.7603, category: "historical", district: "Dambulla", description: "Ancient rock fortress with dropping panoramas.", busyLevel: "Busy", confidence: 88, lastUpdated: new Date(Date.now() - 22 * 60000).toISOString() },
+  { id: "seed-polonnaruwa", name: "Polonnaruwa Ancient City", lat: 7.9403, lon: 81.0188, category: "historical", district: "Polonnaruwa", description: "Ruins of Sri Lanka's medieval capital.", busyLevel: "Quiet", confidence: 74, lastUpdated: new Date(Date.now() - 35 * 60000).toISOString() },
+  { id: "seed-anuradhapura", name: "Anuradhapura Sacred City", lat: 8.3114, lon: 80.4037, category: "historical", district: "Anuradhapura", description: "Ancient stupas and sacred monuments.", busyLevel: "Moderate", confidence: 79, lastUpdated: new Date(Date.now() - 48 * 60000).toISOString() },
+  { id: "seed-jaffna-fort", name: "Jaffna Fort", lat: 9.661, lon: 80.0, category: "historical", district: "Jaffna", description: "Dutch-era seaside fort overlooking the lagoon.", busyLevel: "Quiet", confidence: 71, lastUpdated: new Date(Date.now() - 70 * 60000).toISOString() },
 
-  // Religious
-  {
-    id: "seed-dalada-maligawa",
-    name: "Sri Dalada Maligawa",
-    lat: 7.2936,
-    lon: 80.6413,
-    category: "religious",
-    district: "Kandy",
-    description: "Temple of the Sacred Tooth Relic.",
-    busyLevel: "Very Busy",
-    confidence: 91,
-    lastUpdated: new Date(Date.now() - 8 * 60000).toISOString(),
-  },
-  {
-    id: "seed-gangaramaya",
-    name: "Gangaramaya Temple",
-    lat: 6.9167,
-    lon: 79.8566,
-    category: "religious",
-    district: "Colombo",
-    description: "Colombo's eclectic Buddhist temple & museum.",
-    busyLevel: "Busy",
-    confidence: 85,
-    lastUpdated: new Date(Date.now() - 15 * 60000).toISOString(),
-  },
-  {
-    id: "seed-cave-temple",
-    name: "Dambulla Cave Temple",
-    lat: 7.8567,
-    lon: 80.6492,
-    category: "religious",
-    district: "Dambulla",
-    description: "Rock cave temples with Buddha statues & murals.",
-    busyLevel: "Moderate",
-    confidence: 80,
-    lastUpdated: new Date(Date.now() - 27 * 60000).toISOString(),
-  },
-  {
-    id: "seed-kelaniya",
-    name: "Kelaniya Raja Maha Vihara",
-    lat: 6.9553,
-    lon: 79.9219,
-    category: "religious",
-    district: "Colombo",
-    description: "Historic Buddhist temple with fine murals.",
-    busyLevel: "Quiet",
-    confidence: 72,
-    lastUpdated: new Date(Date.now() - 55 * 60000).toISOString(),
-  },
+  { id: "seed-dalada-maligawa", name: "Sri Dalada Maligawa", lat: 7.2936, lon: 80.6413, category: "religious", district: "Kandy", description: "Temple of the Sacred Tooth Relic.", busyLevel: "Very Busy", confidence: 91, lastUpdated: new Date(Date.now() - 8 * 60000).toISOString() },
+  { id: "seed-gangaramaya", name: "Gangaramaya Temple", lat: 6.9167, lon: 79.8566, category: "religious", district: "Colombo", description: "Colombo's eclectic Buddhist temple & museum.", busyLevel: "Busy", confidence: 85, lastUpdated: new Date(Date.now() - 15 * 60000).toISOString() },
+  { id: "seed-cave-temple", name: "Dambulla Cave Temple", lat: 7.8567, lon: 80.6492, category: "religious", district: "Dambulla", description: "Rock cave temples with Buddha statues & murals.", busyLevel: "Moderate", confidence: 80, lastUpdated: new Date(Date.now() - 27 * 60000).toISOString() },
+  { id: "seed-kelaniya", name: "Kelaniya Raja Maha Vihara", lat: 6.9553, lon: 79.9219, category: "religious", district: "Colombo", description: "Historic Buddhist temple with fine murals.", busyLevel: "Quiet", confidence: 72, lastUpdated: new Date(Date.now() - 55 * 60000).toISOString() },
+  { id: "seed-nallur", name: "Nallur Kandaswamy Kovil", lat: 9.6755, lon: 80.0284, category: "religious", district: "Jaffna", description: "Historic Hindu temple in Jaffna.", busyLevel: "Moderate", confidence: 82, lastUpdated: new Date(Date.now() - 18 * 60000).toISOString() },
 
-  // Natural
-  {
-    id: "seed-ella-nine-arch",
-    name: "Nine Arch Bridge",
-    lat: 6.8764,
-    lon: 81.0586,
-    category: "natural",
-    district: "Badulla",
-    description: "Iconic colonial railway bridge in the hills.",
-    busyLevel: "Busy",
-    confidence: 84,
-    lastUpdated: new Date(Date.now() - 18 * 60000).toISOString(),
-  },
-  {
-    id: "seed-horton-plains",
-    name: "Horton Plains",
-    lat: 6.8096,
-    lon: 80.8,
-    category: "natural",
-    district: "Nuwara Eliya",
-    description: "Highland plateau with World's End cliff.",
-    busyLevel: "Quiet",
-    confidence: 77,
-    lastUpdated: new Date(Date.now() - 42 * 60000).toISOString(),
-  },
-  {
-    id: "seed-mirissa",
-    name: "Mirissa Beach",
-    lat: 5.9483,
-    lon: 80.4589,
-    category: "natural",
-    district: "Matara",
-    description: "Crescent beach famed for whale watching.",
-    busyLevel: "Moderate",
-    confidence: 81,
-    lastUpdated: new Date(Date.now() - 20 * 60000).toISOString(),
-  },
-  {
-    id: "seed-devon-falls",
-    name: "Devon Falls",
-    lat: 6.9575,
-    lon: 80.6,
-    category: "natural",
-    district: "Nuwara Eliya",
-    description: "97m waterfall surrounded by tea country.",
-    busyLevel: "Quiet",
-    confidence: 70,
-    lastUpdated: new Date(Date.now() - 65 * 60000).toISOString(),
-  },
-  {
-    id: "seed-galle-face",
-    name: "Galle Face Green",
-    lat: 6.9271,
-    lon: 79.8441,
-    category: "natural",
-    district: "Colombo",
-    description: "Oceanfront promenade and gathering spot.",
-    busyLevel: "Moderate",
-    confidence: 83,
-    lastUpdated: new Date(Date.now() - 10 * 60000).toISOString(),
-  },
-  {
-    id: "seed-viharamahadevi",
-    name: "Viharamahadevi Park",
-    lat: 6.9159,
-    lon: 79.8614,
-    category: "natural",
-    district: "Colombo",
-    description: "Colombo's largest public park.",
-    busyLevel: "Moderate",
-    confidence: 76,
-    lastUpdated: new Date(Date.now() - 30 * 60000).toISOString(),
-  },
-  {
-    id: "seed-diyatha-uyana",
-    name: "Diyatha Uyana",
-    lat: 6.9021,
-    lon: 79.9495,
-    category: "natural",
-    district: "Colombo",
-    description: "Lakeside park with musical fountains.",
-    busyLevel: "Moderate",
-    confidence: 78,
-    lastUpdated: new Date(Date.now() - 25 * 60000).toISOString(),
-  },
+  { id: "seed-ella-nine-arch", name: "Nine Arch Bridge", lat: 6.8764, lon: 81.0586, category: "natural", district: "Badulla", description: "Iconic colonial railway bridge in the hills.", busyLevel: "Busy", confidence: 84, lastUpdated: new Date(Date.now() - 18 * 60000).toISOString() },
+  { id: "seed-horton-plains", name: "Horton Plains", lat: 6.8096, lon: 80.8, category: "natural", district: "Nuwara Eliya", description: "Highland plateau with World's End cliff.", busyLevel: "Quiet", confidence: 77, lastUpdated: new Date(Date.now() - 42 * 60000).toISOString() },
+  { id: "seed-mirissa", name: "Mirissa Beach", lat: 5.9483, lon: 80.4589, category: "natural", district: "Matara", description: "Crescent beach famed for whale watching.", busyLevel: "Moderate", confidence: 81, lastUpdated: new Date(Date.now() - 20 * 60000).toISOString() },
+  { id: "seed-devon-falls", name: "Devon Falls", lat: 6.9575, lon: 80.6, category: "natural", district: "Nuwara Eliya", description: "97m waterfall surrounded by tea country.", busyLevel: "Quiet", confidence: 70, lastUpdated: new Date(Date.now() - 65 * 60000).toISOString() },
+  { id: "seed-galle-face", name: "Galle Face Green", lat: 6.9271, lon: 79.8441, category: "natural", district: "Colombo", description: "Oceanfront promenade and gathering spot.", busyLevel: "Moderate", confidence: 83, lastUpdated: new Date(Date.now() - 10 * 60000).toISOString() },
+  { id: "seed-viharamahadevi", name: "Viharamahadevi Park", lat: 6.9159, lon: 79.8614, category: "natural", district: "Colombo", description: "Colombo's largest public park.", busyLevel: "Moderate", confidence: 76, lastUpdated: new Date(Date.now() - 30 * 60000).toISOString() },
+  { id: "seed-diyatha-uyana", name: "Diyatha Uyana", lat: 6.9021, lon: 79.9495, category: "natural", district: "Colombo", description: "Lakeside park with musical fountains.", busyLevel: "Moderate", confidence: 78, lastUpdated: new Date(Date.now() - 25 * 60000).toISOString() },
+  { id: "seed-unawatuna", name: "Unawatuna Beach", lat: 6.0174, lon: 80.2489, category: "natural", district: "Galle", description: "Palm-lined bay with calm swimming water.", busyLevel: "Busy", confidence: 86, lastUpdated: new Date(Date.now() - 11 * 60000).toISOString() },
+  { id: "seed-jungle-beach", name: "Jungle Beach", lat: 6.0066, lon: 80.2336, category: "natural", district: "Galle", description: "Secluded cove near Rumassala.", busyLevel: "Quiet", confidence: 73, lastUpdated: new Date(Date.now() - 55 * 60000).toISOString() },
 
-  // Food & Markets
-  {
-    id: "seed-pettah-market",
-    name: "Pettah Market",
-    lat: 6.9391,
-    lon: 79.8566,
-    category: "food",
-    district: "Colombo",
-    description: "Bustling bazaar of spices, produce and street food.",
-    busyLevel: "Very Busy",
-    confidence: 89,
-    lastUpdated: new Date(Date.now() - 6 * 60000).toISOString(),
-  },
-  {
-    id: "seed-good-market",
-    name: "Good Market Colombo",
-    lat: 6.9097,
-    lon: 79.8636,
-    category: "food",
-    district: "Colombo",
-    description: "Weekend farmers' market with Sri Lankan artisan foods.",
-    busyLevel: "Moderate",
-    confidence: 76,
-    lastUpdated: new Date(Date.now() - 25 * 60000).toISOString(),
-  },
-  {
-    id: "seed-galle-fort-food",
-    name: "Galle Fort Food Lane",
-    lat: 6.0268,
-    lon: 80.2171,
-    category: "food",
-    district: "Galle",
-    description: "Seafood cafés and Dutch-era eateries.",
-    busyLevel: "Busy",
-    confidence: 83,
-    lastUpdated: new Date(Date.now() - 14 * 60000).toISOString(),
-  },
-  {
-    id: "seed-nuwara-eliya-market",
-    name: "Nuwara Eliya Central Market",
-    lat: 6.9497,
-    lon: 80.7891,
-    category: "food",
-    district: "Nuwara Eliya",
-    description: "Tea, cheese, and hill-country produce.",
-    busyLevel: "Quiet",
-    confidence: 71,
-    lastUpdated: new Date(Date.now() - 50 * 60000).toISOString(),
-  },
+  { id: "seed-pettah-market", name: "Pettah Market", lat: 6.9391, lon: 79.8566, category: "food", district: "Colombo", description: "Bustling bazaar of spices, produce and street food.", busyLevel: "Very Busy", confidence: 89, lastUpdated: new Date(Date.now() - 6 * 60000).toISOString() },
+  { id: "seed-good-market", name: "Good Market Colombo", lat: 6.9097, lon: 79.8636, category: "food", district: "Colombo", description: "Weekend farmers' market with Sri Lankan artisan foods.", busyLevel: "Moderate", confidence: 76, lastUpdated: new Date(Date.now() - 25 * 60000).toISOString() },
+  { id: "seed-galle-fort-food", name: "Galle Fort Food Lane", lat: 6.0268, lon: 80.2171, category: "food", district: "Galle", description: "Seafood cafés and Dutch-era eateries.", busyLevel: "Busy", confidence: 83, lastUpdated: new Date(Date.now() - 14 * 60000).toISOString() },
+  { id: "seed-nuwara-eliya-market", name: "Nuwara Eliya Central Market", lat: 6.9497, lon: 80.7891, category: "food", district: "Nuwara Eliya", description: "Tea, cheese, and hill-country produce.", busyLevel: "Quiet", confidence: 71, lastUpdated: new Date(Date.now() - 50 * 60000).toISOString() },
+  { id: "seed-kandy-market", name: "Kandy Central Market", lat: 7.2906, lon: 80.6337, category: "food", district: "Kandy", description: "Historic market with spices and textiles.", busyLevel: "Busy", confidence: 78, lastUpdated: new Date(Date.now() - 20 * 60000).toISOString() },
 
-  // Cultural Events / Festivals
-  {
-    id: "seed-navam-perahera",
-    name: "Navam Perahera",
-    lat: 6.9167,
-    lon: 79.8566,
-    category: "events",
-    district: "Colombo",
-    description: "Annual February procession of Gangaramaya Temple.",
-    busyLevel: "Very Busy",
-    confidence: 92,
-    lastUpdated: new Date(Date.now() - 9 * 60000).toISOString(),
-  },
-  {
-    id: "seed-kandy-esala",
-    name: "Kandy Esala Perahera",
-    lat: 7.2936,
-    lon: 80.6413,
-    category: "events",
-    district: "Kandy",
-    description: "Ten-day cultural procession (July/August).",
-    busyLevel: "Very Busy",
-    confidence: 95,
-    lastUpdated: new Date(Date.now() - 4 * 60000).toISOString(),
-  },
-  {
-    id: "seed-galle-literary",
-    name: "Galle Literary Festival",
-    lat: 6.0257,
-    lon: 80.217,
-    category: "events",
-    district: "Galle",
-    description: "January festival within the historic fort.",
-    busyLevel: "Busy",
-    confidence: 78,
-    lastUpdated: new Date(Date.now() - 33 * 60000).toISOString(),
-  },
-  {
-    id: "seed-kandy-cultural-show",
-    name: "Kandy Cultural Show",
-    lat: 7.2906,
-    lon: 80.6337,
-    category: "events",
-    district: "Kandy",
-    description: "Nightly dance & drumming performances.",
-    busyLevel: "Moderate",
-    confidence: 75,
-    lastUpdated: new Date(Date.now() - 28 * 60000).toISOString(),
-  },
+  { id: "seed-navam-perahera", name: "Navam Perahera", lat: 6.9167, lon: 79.8566, category: "events", district: "Colombo", description: "Annual February procession of Gangaramaya Temple.", busyLevel: "Very Busy", confidence: 92, lastUpdated: new Date(Date.now() - 9 * 60000).toISOString() },
+  { id: "seed-kandy-esala", name: "Kandy Esala Perahera", lat: 7.2936, lon: 80.6413, category: "events", district: "Kandy", description: "Ten-day cultural procession (July/August).", busyLevel: "Very Busy", confidence: 95, lastUpdated: new Date(Date.now() - 4 * 60000).toISOString() },
+  { id: "seed-galle-literary", name: "Galle Literary Festival", lat: 6.0257, lon: 80.217, category: "events", district: "Galle", description: "January festival within the historic fort.", busyLevel: "Busy", confidence: 78, lastUpdated: new Date(Date.now() - 33 * 60000).toISOString() },
+  { id: "seed-kandy-cultural-show", name: "Kandy Cultural Show", lat: 7.2906, lon: 80.6337, category: "events", district: "Kandy", description: "Nightly dance & drumming performances.", busyLevel: "Moderate", confidence: 75, lastUpdated: new Date(Date.now() - 28 * 60000).toISOString() },
 
-  // Hidden Gems
-  {
-    id: "seed-pidurangala",
-    name: "Pidurangala Rock",
-    lat: 7.9625,
-    lon: 80.7614,
-    category: "natural",
-    district: "Dambulla",
-    description: "Quieter climb across from Sigiriya with the best view of the rock.",
-    busyLevel: "Quiet",
-    confidence: 73,
-    lastUpdated: new Date(Date.now() - 40 * 60000).toISOString(),
-    isHiddenGem: true,
-  },
-  {
-    id: "seed-sembuwatta",
-    name: "Sembuwatta Lake",
-    lat: 7.2997,
-    lon: 80.7719,
-    category: "natural",
-    district: "Matale",
-    description: "Emerald man-made lake tucked in the hills.",
-    busyLevel: "Quiet",
-    confidence: 68,
-    lastUpdated: new Date(Date.now() - 90 * 60000).toISOString(),
-    isHiddenGem: true,
-  },
-  {
-    id: "seed-hiriketiya",
-    name: "Hiriketiya Bay",
-    lat: 5.967,
-    lon: 80.6247,
-    category: "natural",
-    district: "Matara",
-    description: "Horseshoe-shaped surf bay, still low-key.",
-    busyLevel: "Moderate",
-    confidence: 74,
-    lastUpdated: new Date(Date.now() - 21 * 60000).toISOString(),
-    isHiddenGem: true,
-  },
-  {
-    id: "seed-belihuloya",
-    name: "Belihuloya Forest",
-    lat: 6.7547,
-    lon: 80.7747,
-    category: "natural",
-    district: "Ratnapura",
-    description: "Cool riverine trails between the hills and lowlands.",
-    busyLevel: "Quiet",
-    confidence: 66,
-    lastUpdated: new Date(Date.now() - 120 * 60000).toISOString(),
-    isHiddenGem: true,
-  },
-  {
-    id: "seed-popham",
-    name: "Popham's Arboretum",
-    lat: 7.855,
-    lon: 80.653,
-    category: "natural",
-    district: "Dambulla",
-    description: "Dry-zone forest arboretum for wildlife walks.",
-    busyLevel: "Quiet",
-    confidence: 67,
-    lastUpdated: new Date(Date.now() - 75 * 60000).toISOString(),
-    isHiddenGem: true,
-  },
-  {
-    id: "seed-sahas-uyana",
-    name: "Sahas Uyana",
-    lat: 7.2906,
-    lon: 80.635,
-    category: "natural",
-    district: "Kandy",
-    description: "Calm gardens above Kandy with a lookout.",
-    busyLevel: "Quiet",
-    confidence: 70,
-    lastUpdated: new Date(Date.now() - 60 * 60000).toISOString(),
-    isHiddenGem: true,
-  },
-  {
-    id: "seed-beira-lake",
-    name: "Beira Lake",
-    lat: 6.9245,
-    lon: 79.8536,
-    category: "natural",
-    district: "Colombo",
-    description: "Quiet lake walk in central Colombo.",
-    busyLevel: "Quiet",
-    confidence: 65,
-    lastUpdated: new Date(Date.now() - 80 * 60000).toISOString(),
-    isHiddenGem: true,
-  },
-  {
-    id: "seed-independence-arcade",
-    name: "Arcade Independence Square",
-    lat: 6.9033,
-    lon: 79.8666,
-    category: "food",
-    district: "Colombo",
-    description: "Restored colonial shopping & dining arcade.",
-    busyLevel: "Moderate",
-    confidence: 72,
-    lastUpdated: new Date(Date.now() - 45 * 60000).toISOString(),
-    isHiddenGem: true,
-  },
+  { id: "seed-pidurangala", name: "Pidurangala Rock", lat: 7.9625, lon: 80.7614, category: "natural", district: "Dambulla", description: "Quieter climb across from Sigiriya with the best view of the rock.", busyLevel: "Quiet", confidence: 73, lastUpdated: new Date(Date.now() - 40 * 60000).toISOString(), isHiddenGem: true },
+  { id: "seed-sembuwatta", name: "Sembuwatta Lake", lat: 7.2997, lon: 80.7719, category: "natural", district: "Matale", description: "Emerald man-made lake tucked in the hills.", busyLevel: "Quiet", confidence: 68, lastUpdated: new Date(Date.now() - 90 * 60000).toISOString(), isHiddenGem: true },
+  { id: "seed-hiriketiya", name: "Hiriketiya Bay", lat: 5.967, lon: 80.6247, category: "natural", district: "Matara", description: "Horseshoe-shaped surf bay, still low-key.", busyLevel: "Moderate", confidence: 74, lastUpdated: new Date(Date.now() - 21 * 60000).toISOString(), isHiddenGem: true },
+  { id: "seed-belihuloya", name: "Belihuloya Forest", lat: 6.7547, lon: 80.7747, category: "natural", district: "Ratnapura", description: "Cool riverine trails between the hills and lowlands.", busyLevel: "Quiet", confidence: 66, lastUpdated: new Date(Date.now() - 120 * 60000).toISOString(), isHiddenGem: true },
+  { id: "seed-popham", name: "Popham's Arboretum", lat: 7.855, lon: 80.653, category: "natural", district: "Dambulla", description: "Dry-zone forest arboretum for wildlife walks.", busyLevel: "Quiet", confidence: 67, lastUpdated: new Date(Date.now() - 75 * 60000).toISOString(), isHiddenGem: true },
+  { id: "seed-sahas-uyana", name: "Sahas Uyana", lat: 7.2906, lon: 80.635, category: "natural", district: "Kandy", description: "Calm gardens above Kandy with a lookout.", busyLevel: "Quiet", confidence: 70, lastUpdated: new Date(Date.now() - 60 * 60000).toISOString(), isHiddenGem: true },
+  { id: "seed-beira-lake", name: "Beira Lake", lat: 6.9245, lon: 79.8536, category: "natural", district: "Colombo", description: "Quiet lake walk in central Colombo.", busyLevel: "Quiet", confidence: 65, lastUpdated: new Date(Date.now() - 80 * 60000).toISOString(), isHiddenGem: true },
+  { id: "seed-independence-arcade", name: "Arcade Independence Square", lat: 6.9033, lon: 79.8666, category: "food", district: "Colombo", description: "Restored colonial shopping & dining arcade.", busyLevel: "Moderate", confidence: 72, lastUpdated: new Date(Date.now() - 45 * 60000).toISOString(), isHiddenGem: true },
+  { id: "seed-rumassala", name: "Rumassala Hill", lat: 6.0106, lon: 80.2253, category: "natural", district: "Galle", description: "Mythical herbal hill with ocean views.", busyLevel: "Quiet", confidence: 69, lastUpdated: new Date(Date.now() - 100 * 60000).toISOString(), isHiddenGem: true },
+  { id: "seed-martin-bungalow", name: "Martin's Bungalow Viewpoint", lat: 6.8108, lon: 80.8, category: "natural", district: "Nuwara Eliya", description: "Quiet viewpoint near Horton Plains.", busyLevel: "Quiet", confidence: 64, lastUpdated: new Date(Date.now() - 110 * 60000).toISOString(), isHiddenGem: true },
 ];
 
-// Basic Sinhala/Tamil phrases for travellers (dissertation §5.2)
-const LANGUAGE_PHRASES: {
-  english: string;
-  sinhala: string;
-  tamil: string;
-}[] = [
-    { english: "Hello", sinhala: "Āyubōwan (ආයුබෝවන්)", tamil: "Vaṇakkam (வணக்கம்)" },
-    { english: "Thank you", sinhala: "Bohoma sthūthi (බොහොම ස්තූතියි)", tamil: "Naṉṟi (நன்றி)" },
-    { english: "How much?", sinhala: "Kīyada? (කීයද?)", tamil: "Evvaḷavu? (எவ்வளவு?)" },
-    { english: "Where is...?", sinhala: "...koheda? (...කොහෙද?)", tamil: "...eṅkē? (...எங்கே?)" },
-    { english: "Excuse me", sinhala: "Samāvenna (සමාවෙන්න)", tamil: "Mannikkavum (மன்னிக்கவும்)" },
-    { english: "Yes / No", sinhala: "Ov / Nǣ (ඔව් / නෑ)", tamil: "Ām / Illai (ஆம் / இல்லை)" },
-  ];
+const LANGUAGE_PHRASES: { english: string; sinhala: string; tamil: string }[] = [
+  { english: "Hello", sinhala: "Āyubōwan (ආයුබෝවන්)", tamil: "Vaṇakkam (வணக்கம்)" },
+  { english: "Thank you", sinhala: "Bohoma sthūthi (බොහොම ස්තූතියි)", tamil: "Naṉṟi (நன்றி)" },
+  { english: "How much?", sinhala: "Kīyada? (කීයද?)", tamil: "Evvaḷavu? (எவ்வளவு?)" },
+  { english: "Where is...?", sinhala: "...koheda? (...කොහෙද?)", tamil: "...eṅkē? (...எங்கே?)" },
+  { english: "Excuse me", sinhala: "Samāvenna (සමාවෙන්න)", tamil: "Mannikkavum (மன்னிக்கவும்)" },
+  { english: "Yes / No", sinhala: "Ov / Nǣ (ඔව් / නෑ)", tamil: "Ām / Illai (ஆම் / இல்லை)" },
+];
 
-// ------------------------------------------------------------------
-// Sri Lankan festival calendar (approximate — shown when current date
-// is within the window). Used for realtime "Festival nearby" alert.
-// ------------------------------------------------------------------
 type Festival = {
   name: string;
   district: string;
@@ -528,87 +167,15 @@ type Festival = {
 };
 
 const FESTIVALS: Festival[] = [
-  {
-    name: "Galle Literary Festival",
-    district: "Galle",
-    startMonth: 1,
-    startDay: 20,
-    endMonth: 1,
-    endDay: 25,
-    note: "Literary festival inside the historic fort — expect busy cafés.",
-  },
-  {
-    name: "Navam Perahera",
-    district: "Colombo",
-    startMonth: 2,
-    startDay: 20,
-    endMonth: 2,
-    endDay: 25,
-    note: "Procession begins ~6:30 PM near Gangaramaya — heavy crowds.",
-  },
-  {
-    name: "Sinhala & Tamil New Year",
-    district: "All",
-    startMonth: 4,
-    startDay: 13,
-    endMonth: 4,
-    endDay: 15,
-    note: "National new year — shops close, roads quieter then very busy.",
-  },
-  {
-    name: "Vesak Festival",
-    district: "All",
-    startMonth: 5,
-    startDay: 10,
-    endMonth: 5,
-    endDay: 15,
-    note: "Lantern displays across temples — evenings very busy.",
-  },
-  {
-    name: "Poson Poya",
-    district: "Anuradhapura",
-    startMonth: 6,
-    startDay: 1,
-    endMonth: 6,
-    endDay: 15,
-    note: "Mihintale & Anuradhapura draw large pilgrim crowds.",
-  },
-  {
-    name: "Kandy Esala Perahera",
-    district: "Kandy",
-    startMonth: 7,
-    startDay: 25,
-    endMonth: 8,
-    endDay: 15,
-    note: "Ten-day cultural procession — Kandy centre very congested.",
-  },
-  {
-    name: "Nallur Festival",
-    district: "Jaffna",
-    startMonth: 8,
-    startDay: 15,
-    endMonth: 9,
-    endDay: 10,
-    note: "25-day temple festival — expect heavy crowds near Nallur Kovil.",
-  },
-  {
-    name: "Deepavali",
-    district: "All",
-    startMonth: 10,
-    startDay: 20,
-    endMonth: 11,
-    endDay: 5,
-    note: "Hindu festival of lights — temples and markets busy.",
-  },
-  {
-    name: "Unduvap Poya",
-    district: "Anuradhapura",
-    startMonth: 12,
-    startDay: 1,
-    endMonth: 12,
-    endDay: 15,
-    note: "Commemorates arrival of Sri Maha Bodhi sapling.",
-  },
+  { name: "Galle Literary Festival", district: "Galle", startMonth: 1, startDay: 20, endMonth: 1, endDay: 25, note: "Literary festival inside the historic fort — expect busy cafés." },
+  { name: "Navam Perahera", district: "Colombo", startMonth: 2, startDay: 20, endMonth: 2, endDay: 25, note: "Procession begins ~6:30 PM near Gangaramaya — heavy crowds." },
+  { name: "Sinhala & Tamil New Year", district: "All", startMonth: 4, startDay: 13, endMonth: 4, endDay: 15, note: "National new year — shops close, roads quieter then very busy." },
+  { name: "Vesak Festival", district: "All", startMonth: 5, startDay: 10, endMonth: 5, endDay: 15, note: "Lantern displays across temples — evenings very busy." },
+  { name: "Poson Poya", district: "Anuradhapura", startMonth: 6, startDay: 1, endMonth: 6, endDay: 15, note: "Mihintale & Anuradhapura draw large pilgrim crowds." },
+  { name: "Kandy Esala Perahera", district: "Kandy", startMonth: 7, startDay: 25, endMonth: 8, endDay: 15, note: "Ten-day cultural procession — Kandy centre very congested." },
+  { name: "Nallur Festival", district: "Jaffna", startMonth: 8, startDay: 15, endMonth: 9, endDay: 10, note: "25-day temple festival — expect heavy crowds near Nallur Kovil." },
+  { name: "Deepavali", district: "All", startMonth: 10, startDay: 20, endMonth: 11, endDay: 5, note: "Hindu festival of lights — temples and markets busy." },
+  { name: "Unduvap Poya", district: "Anuradhapura", startMonth: 12, startDay: 1, endMonth: 12, endDay: 15, note: "Commemorates arrival of Sri Maha Bodhi sapling." },
 ];
 
 function inFestivalWindow(f: Festival, d: Date): boolean {
@@ -618,7 +185,6 @@ function inFestivalWindow(f: Festival, d: Date): boolean {
   const end = f.endMonth * 100 + f.endDay;
   const now = m * 100 + day;
   if (start <= end) return now >= start && now <= end;
-  // wrap around year end
   return now >= start || now <= end;
 }
 
@@ -635,59 +201,37 @@ export default function HomePage() {
   const [location, setLocation] = useState("Colombo District");
   const [places, setPlaces] = useState<Place[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [preferences, setPreferences] = useState<string[]>([]);
 
-  // UI state for new features
   const [activeCategory, setActiveCategory] = useState<CategoryKey>("all");
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLanguageHelp, setShowLanguageHelp] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
-  // Detected district — drives "near me" filtering
   const [detectedDistrict, setDetectedDistrict] = useState<string | null>(null);
 
-  const PREFERENCE_TAGS: Record<string, { key: string; values: string[] }> = {
-    "historical sites": {
-      key: "historic",
-      values: ["castle", "fort", "monument", "memorial", "archaeological_site"],
-    },
-    "natural spots": {
-      key: "natural",
-      values: ["waterfall", "wood", "beach", "cliff", "grassland", "wetland"],
-    },
-    "cultural events": {
-      key: "amenity",
-      values: ["theatre", "arts_centre", "community_centre", "cinema"],
-    },
-    "religious sites": {
-      key: "amenity",
-      values: ["place_of_worship"],
-    },
-    "local food spots": {
-      key: "amenity",
-      values: ["restaurant", "cafe", "fast_food", "food_court"],
-    },
-  };
+  // Search mode overrides district filter
+  const [searchMode, setSearchMode] = useState<null | {
+    query: string;
+    district: string;
+    lat: number;
+    lon: number;
+  }>(null);
 
   const inferCategory = (p: Place): string => {
     if (p.category) return p.category;
     const n = (p.name || "").toLowerCase();
     if (/(temple|kovil|church|mosque|vihara|dagoba|stupa|maligawa)/.test(n)) return "religious";
     if (/(fort|museum|heritage|ruin|palace|monument|archae|ancient|polonnaruwa|anuradhapura)/.test(n)) return "historical";
-    if (/(beach|waterfall|falls|park|forest|mountain|cliff|lake|bay|lagoon|rock|peak|plains)/.test(n))
-      return "natural";
+    if (/(beach|waterfall|falls|park|forest|mountain|cliff|lake|bay|lagoon|rock|peak|plains)/.test(n)) return "natural";
     if (/(market|restaurant|cafe|food|bazaar|street|lane)/.test(n)) return "food";
     if (/(festival|parade|event|show|perahera)/.test(n)) return "events";
     return "other";
   };
 
-  // Deterministic pseudo-random for generating confidence/lastUpdated for
-  // API-fetched places that don't have them yet. Same input → same output,
-  // so values don't jitter between renders.
   function hashString(s: string): number {
     let h = 0;
     for (let i = 0; i < s.length; i++) {
@@ -700,7 +244,7 @@ export default function HomePage() {
   function fillMissingMeta(p: Place): Place {
     if (p.confidence != null && p.lastUpdated && p.busyLevel) return p;
     const seed = hashString(p.id + p.name);
-    const confidence = p.confidence ?? 60 + (seed % 35); // 60-94
+    const confidence = p.confidence ?? 60 + (seed % 35);
     const minutesAgo = 5 + (seed % 90);
     const lastUpdated = p.lastUpdated ?? new Date(Date.now() - minutesAgo * 60000).toISOString();
     const busyOptions: Busy[] = ["Quiet", "Moderate", "Busy", "Very Busy"];
@@ -733,32 +277,39 @@ export default function HomePage() {
     return Array.from(map.values());
   };
 
-  // Merge live places with seed places
   const allPlaces = useMemo(() => {
     const merged = dedupe([...places, ...SEED_PLACES]);
-    // ensure every card has confidence, lastUpdated, busyLevel
     return merged.map(fillMissingMeta);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [places]);
 
-  // District-filtered view (if we have a detected district)
+  // FILTER: search takes priority over detected district
   const placesInDistrict = useMemo(() => {
+    if (searchMode) {
+      const byDistrict = allPlaces.filter(
+        (p) => (p.district || "").toLowerCase() === searchMode.district.toLowerCase()
+      );
+      if (byDistrict.length > 0) return byDistrict;
+
+      const nearby = allPlaces.filter(
+        (p) => distanceKm(p.lat, p.lon, searchMode.lat, searchMode.lon) <= 50
+      );
+      return nearby.length > 0 ? nearby : allPlaces;
+    }
+
     if (!detectedDistrict) return allPlaces;
     const inDistrict = allPlaces.filter(
       (p) => (p.district || "").toLowerCase() === detectedDistrict.toLowerCase()
     );
-    // fallback: if nothing in this district, just return all so the UI isn't empty
     return inDistrict.length > 0 ? inDistrict : allPlaces;
-  }, [allPlaces, detectedDistrict]);
+  }, [allPlaces, detectedDistrict, searchMode]);
 
-  // Apply category filter on top of district filter
   const filteredPlaces = useMemo(() => {
     if (activeCategory === "all") return placesInDistrict;
     if (activeCategory === "hidden") return placesInDistrict.filter((p) => p.isHiddenGem);
     return placesInDistrict.filter((p) => inferCategory(p) === activeCategory);
   }, [placesInDistrict, activeCategory]);
 
-  // Hidden gems strip — also filtered by detected district (per user request)
   const hiddenGems = useMemo(
     () => placesInDistrict.filter((p) => p.isHiddenGem).slice(0, 10),
     [placesInDistrict]
@@ -827,6 +378,7 @@ export default function HomePage() {
     }
   };
 
+  // AUTH + load profile (preferences + last reported busy level cached)
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
@@ -837,13 +389,34 @@ export default function HomePage() {
           const res = await fetch(`/api/profile?uid=${u.uid}`);
           const data = await res.json();
           setPreferences(data?.preferences || []);
+
+          if (data?.lastLocation?.busyLevel && typeof window !== "undefined") {
+            (window as any).__lastLocation = data.lastLocation;
+          }
         } catch { }
       }
     });
     return () => unsub();
   }, []);
 
-  // Hydrate seed images from Wikipedia/Unsplash once
+  // Restore previously-submitted busy level when detectedCity loads
+  useEffect(() => {
+    if (!detectedCity || detectedCity.busyLevel) return;
+    const last = typeof window !== "undefined" ? (window as any).__lastLocation : null;
+    if (!last || !last.busyLevel) return;
+
+    const sameSpot =
+      Math.abs(last.lat - detectedCity.lat) < 0.005 &&
+      Math.abs(last.lon - detectedCity.lon) < 0.005;
+    const sameName = (last.name || "").toLowerCase() === detectedCity.name.toLowerCase();
+    const recent = last.timestamp && Date.now() - last.timestamp < 6 * 60 * 60 * 1000;
+
+    if ((sameSpot || sameName) && recent) {
+      setDetectedCity((prev) => (prev ? { ...prev, busyLevel: last.busyLevel } : prev));
+    }
+  }, [detectedCity]);
+
+  // Hydrate seed images
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -865,23 +438,38 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ------------------------------------------------------------------
-  // REAL-TIME WEATHER + EVENT NOTIFICATIONS
-  // Rebuilds whenever detected city / district changes.
-  // Uses Open-Meteo (no API key) for weather, local festival calendar
-  // for events.
-  // ------------------------------------------------------------------
+  // Real-time weather + events — uses searched location if search active
+  const alertContext = useMemo(() => {
+    if (searchMode) {
+      return {
+        name: searchMode.query,
+        lat: searchMode.lat,
+        lon: searchMode.lon,
+        district: searchMode.district,
+      };
+    }
+    if (detectedCity) {
+      return {
+        name: detectedCity.name,
+        lat: detectedCity.lat,
+        lon: detectedCity.lon,
+        district: detectedDistrict || "",
+      };
+    }
+    return null;
+  }, [searchMode, detectedCity, detectedDistrict]);
+
   useEffect(() => {
-    if (!detectedCity) return;
+    if (!alertContext) return;
+    const ctx = alertContext;
 
     const buildAlerts = async () => {
       const alerts: AppNotification[] = [];
 
-      // 1) Weather from Open-Meteo — current + next hour precipitation
       try {
         const url = new URL("https://api.open-meteo.com/v1/forecast");
-        url.searchParams.set("latitude", String(detectedCity.lat));
-        url.searchParams.set("longitude", String(detectedCity.lon));
+        url.searchParams.set("latitude", String(ctx.lat));
+        url.searchParams.set("longitude", String(ctx.lon));
         url.searchParams.set(
           "current",
           "temperature_2m,precipitation,weather_code,wind_speed_10m"
@@ -903,7 +491,6 @@ export default function HomePage() {
         const hourlyPrecip: number[] = j?.hourly?.precipitation || [];
         const hourlyTimes: string[] = j?.hourly?.time || [];
 
-        // Find index of current hour
         const now = new Date();
         const currentHourISO = new Date(
           now.getFullYear(),
@@ -919,16 +506,13 @@ export default function HomePage() {
         const maxProb = nextProbs.length ? Math.max(...nextProbs) : 0;
         const anyRain = nextPrecip.some((p) => p > 0.2);
 
-        // Current weather summary
         const weatherDesc = weatherCodeToText(code);
 
         alerts.push({
           id: "weather-now",
           type: "weather",
-          title: `Weather in ${detectedCity.name}`,
-          message: `${weatherDesc}, ${Math.round(temp)}°C · wind ${Math.round(
-            wind
-          )} km/h.`,
+          title: `Weather in ${ctx.name}`,
+          message: `${weatherDesc}, ${Math.round(temp)}°C · wind ${Math.round(wind)} km/h.`,
           time: "Just now",
         });
 
@@ -937,7 +521,7 @@ export default function HomePage() {
             id: "weather-rain",
             type: "weather",
             title: "Rain expected soon",
-            message: `Rain likely in the next 1–2 hours near ${detectedCity.name} (${maxProb}% chance) — trails may be slippery.`,
+            message: `Rain likely in the next 1–2 hours near ${ctx.name} (${maxProb}% chance) — trails may be slippery.`,
             time: "Just now",
           });
         } else if (maxProb >= 40) {
@@ -945,7 +529,7 @@ export default function HomePage() {
             id: "weather-chance",
             type: "weather",
             title: "Possible showers",
-            message: `There is a ${maxProb}% chance of showers near ${detectedCity.name} in the next few hours.`,
+            message: `There is a ${maxProb}% chance of showers near ${ctx.name} in the next few hours.`,
             time: "Just now",
           });
         }
@@ -955,26 +539,17 @@ export default function HomePage() {
             id: "weather-wind",
             type: "safety",
             title: "Strong winds",
-            message: `Winds around ${Math.round(
-              wind
-            )} km/h near ${detectedCity.name} — take care on viewpoints and beaches.`,
+            message: `Winds around ${Math.round(wind)} km/h near ${ctx.name} — take care on viewpoints and beaches.`,
             time: "Just now",
           });
         }
-      } catch (e) {
-        // silent — no weather alert if API fails
-      }
+      } catch { }
 
-      // 2) Events — local festival calendar, matched by date + district
       try {
         const today = new Date();
-        const districtMatch = detectedDistrict || "";
         const active = FESTIVALS.filter((f) => inFestivalWindow(f, today));
-
         const relevant = active.filter(
-          (f) =>
-            f.district === "All" ||
-            f.district.toLowerCase() === districtMatch.toLowerCase()
+          (f) => f.district === "All" || f.district.toLowerCase() === ctx.district.toLowerCase()
         );
 
         relevant.forEach((f, i) => {
@@ -987,15 +562,13 @@ export default function HomePage() {
           });
         });
 
-        // If nothing local, surface the next upcoming national festival as a heads-up
         if (relevant.length === 0) {
           const upcoming = FESTIVALS.map((f) => {
             const y = today.getFullYear();
             const start = new Date(y, f.startMonth - 1, f.startDay);
             if (start < today) start.setFullYear(y + 1);
             return { f, start };
-          })
-            .sort((a, b) => a.start.getTime() - b.start.getTime())[0];
+          }).sort((a, b) => a.start.getTime() - b.start.getTime())[0];
 
           if (upcoming) {
             const days = Math.round(
@@ -1014,14 +587,13 @@ export default function HomePage() {
         }
       } catch { }
 
-      // 3) Time-of-day quiet window hint
       const hr = new Date().getHours();
       if (hr >= 6 && hr <= 8) {
         alerts.push({
           id: "quiet-morning",
           type: "quiet",
           title: "Quiet window",
-          message: `Early morning is usually the quietest time to visit popular spots in ${detectedCity.name}.`,
+          message: `Early morning is usually the quietest time to visit popular spots in ${ctx.name}.`,
           time: "Just now",
         });
       } else if (hr >= 14 && hr <= 16) {
@@ -1029,7 +601,7 @@ export default function HomePage() {
           id: "quiet-afternoon",
           type: "quiet",
           title: "Quiet window",
-          message: `Mid-afternoon tends to be calmer than evenings near ${detectedCity.name}.`,
+          message: `Mid-afternoon tends to be calmer than evenings near ${ctx.name}.`,
           time: "Just now",
         });
       }
@@ -1038,11 +610,9 @@ export default function HomePage() {
     };
 
     buildAlerts();
-    // refresh every 10 min
     const iv = setInterval(buildAlerts, 10 * 60 * 1000);
     return () => clearInterval(iv);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detectedCity?.lat, detectedCity?.lon, detectedDistrict]);
+  }, [alertContext?.lat, alertContext?.lon, alertContext?.district, alertContext?.name]);
 
   function weatherCodeToText(code?: number): string {
     if (code == null) return "Conditions unavailable";
@@ -1058,7 +628,10 @@ export default function HomePage() {
     return "Mixed weather";
   }
 
-  const fetchWikidataImageByCoords = async (lat: number, lon: number): Promise<string | null> => {
+  const fetchWikidataImageByCoords = async (
+    lat: number,
+    lon: number
+  ): Promise<string | null> => {
     try {
       const url = new URL("https://nominatim.openstreetmap.org/reverse");
       url.searchParams.set("format", "jsonv2");
@@ -1090,68 +663,6 @@ export default function HomePage() {
       return null;
     }
   };
-
-  async function fetchPlacesForPreferences(
-    lat: number,
-    lon: number,
-    prefs: string[]
-  ): Promise<Place[]> {
-    try {
-      if (!prefs.length) return [];
-
-      const queries = prefs
-        .map((pref) => {
-          const prefMap = PREFERENCE_TAGS[pref];
-          if (!prefMap) return "";
-          const valueFilters = prefMap.values
-            .map((v) => `node["${prefMap.key}"="${v}"](around:20000,${lat},${lon});`)
-            .join("\n");
-          return valueFilters;
-        })
-        .filter(Boolean)
-        .join("\n");
-
-      if (!queries) return [];
-
-      const fullQuery = `
-      [out:json][timeout:30];
-      (
-        ${queries}
-      );
-      out center tags;
-    `;
-
-      const res = await fetch("https://overpass-api.de/api/interpreter", {
-        method: "POST",
-        body: fullQuery,
-        headers: { "Content-Type": "text/plain" },
-      });
-
-      const json = await res.json();
-      const resultElements = json?.elements || [];
-
-      const results: Place[] = await Promise.all(
-        resultElements
-          .filter((el: any) => el.tags?.name)
-          .map(async (el: any) => {
-            const img = await fetchPlaceImageByName(el.tags.name);
-            return {
-              id: String(el.id),
-              name: el.tags.name,
-              lat: el.lat || el.center?.lat,
-              lon: el.lon || el.center?.lon,
-              image: img,
-              description: el.tags?.description || "",
-            } as Place;
-          })
-      );
-
-      return results;
-    } catch (err) {
-      console.error("Preference fetch error:", err);
-      return [];
-    }
-  }
 
   const fetchWikipediaGeoImage = async (lat: number, lon: number): Promise<any | null> => {
     try {
@@ -1192,7 +703,6 @@ export default function HomePage() {
     addr: any
   ): Promise<string> => {
     const cacheKey = `img-geo-${lat.toFixed(4)},${lon.toFixed(4)}`;
-
     try {
       if (typeof window !== "undefined") {
         const cached = localStorage.getItem(cacheKey);
@@ -1211,7 +721,9 @@ export default function HomePage() {
         return geo.url;
       }
 
-      const named = await fetchPlaceImageByName([detectedName, addr?.city, addr?.town, "Colombo"].filter(Boolean) as string[]);
+      const named = await fetchPlaceImageByName(
+        [detectedName, addr?.city, addr?.town, "Colombo"].filter(Boolean) as string[]
+      );
       if (typeof window !== "undefined") localStorage.setItem(cacheKey, named);
       return named;
     } catch {
@@ -1219,9 +731,9 @@ export default function HomePage() {
     }
   };
 
+  // Geolocation
   useEffect(() => {
     if (!("geolocation" in navigator)) return;
-
     setDetectingCity(true);
 
     navigator.geolocation.getCurrentPosition(
@@ -1236,10 +748,7 @@ export default function HomePage() {
           url.searchParams.set("extratags", "1");
 
           const r = await fetch(url.toString(), {
-            headers: {
-              "Accept-Language": "en",
-              "User-Agent": "CrowdPlaces/1.0",
-            },
+            headers: { "Accept-Language": "en", "User-Agent": "CrowdPlaces/1.0" },
             cache: "no-store",
           });
 
@@ -1255,18 +764,9 @@ export default function HomePage() {
             addr.county ||
             "Nearby City";
 
-          // Detect district:
-          // 1) Use Nominatim `state_district` or `county` if it matches a known SL district
-          // 2) Otherwise snap to nearest district by coordinates
           const candidateDistrict: string =
-            addr.state_district ||
-            addr.county ||
-            addr.region ||
-            "";
-
-          const normalizedCandidate = candidateDistrict
-            .replace(/ District$/i, "")
-            .trim();
+            addr.state_district || addr.county || addr.region || "";
+          const normalizedCandidate = candidateDistrict.replace(/ District$/i, "").trim();
 
           const knownDistrict = SRI_LANKA_DISTRICTS.find(
             (d) => d.name.toLowerCase() === normalizedCandidate.toLowerCase()
@@ -1275,7 +775,6 @@ export default function HomePage() {
           const district = knownDistrict
             ? knownDistrict.name
             : findNearestDistrict(latitude, longitude);
-
           setDetectedDistrict(district);
 
           const img = await fetchImageByCoordsFirst(latitude, longitude, cityName, addr);
@@ -1301,6 +800,7 @@ export default function HomePage() {
     );
   }, []);
 
+  // /api/crowd fetch
   useEffect(() => {
     const fetchColomboPlaces = async () => {
       try {
@@ -1311,7 +811,6 @@ export default function HomePage() {
         if (!res.ok) throw new Error(`API returned status ${res.status}`);
 
         const data: Place[] = await res.json();
-
         if (!Array.isArray(data) || data.length === 0) {
           setPlaces([]);
           return;
@@ -1326,7 +825,6 @@ export default function HomePage() {
 
         setPlaces(withImages);
       } catch {
-        // silent
       } finally {
         setLoading(false);
       }
@@ -1335,9 +833,12 @@ export default function HomePage() {
     fetchColomboPlaces();
   }, [UNSPLASH_KEY]);
 
+  // SEARCH
   const handleSearch = async () => {
-    if (!searchQuery) {
-      setSearchResults([]);
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchMode(null);
+      setLocation(detectedDistrict ? `${detectedDistrict} District` : "Colombo District");
       return;
     }
 
@@ -1346,70 +847,61 @@ export default function HomePage() {
     try {
       const geoRes = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-          searchQuery
+          q
         )}+Sri+Lanka`,
-        {
-          headers: {
-            "Accept-Language": "en",
-            "User-Agent": "CrowdPlaces/1.0",
-          },
-        }
+        { headers: { "Accept-Language": "en", "User-Agent": "CrowdPlaces/1.0" } }
       );
 
       const geoData = await geoRes.json();
       if (!geoData[0]) {
-        setSearchResults([]);
+        setSearchMode(null);
         return;
       }
 
-      const { lat, lon } = geoData[0];
+      const lat = parseFloat(geoData[0].lat);
+      const lon = parseFloat(geoData[0].lon);
 
-      const overpassQuery = `
-        [out:json][timeout:25];
-        (
-          node["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:20000,${lat},${lon});
-          way["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:20000,${lat},${lon});
-          relation["tourism"~"attraction|museum|zoo|theme_park|viewpoint"](around:20000,${lat},${lon});
+      let district = findNearestDistrict(lat, lon);
+
+      try {
+        const rUrl = new URL("https://nominatim.openstreetmap.org/reverse");
+        rUrl.searchParams.set("format", "jsonv2");
+        rUrl.searchParams.set("lat", String(lat));
+        rUrl.searchParams.set("lon", String(lon));
+        const rRes = await fetch(rUrl.toString(), {
+          headers: { "Accept-Language": "en", "User-Agent": "CrowdPlaces/1.0" },
+          cache: "no-store",
+        });
+        const rJson = await rRes.json();
+        const candidate = (rJson?.address?.state_district || rJson?.address?.county || "")
+          .replace(/ District$/i, "")
+          .trim();
+        const known = SRI_LANKA_DISTRICTS.find(
+          (d) => d.name.toLowerCase() === candidate.toLowerCase()
         );
-        out center tags;
-      `;
+        if (known) district = known.name;
+      } catch { }
 
-      const overpassRes = await fetch("https://overpass-api.de/api/interpreter", {
-        method: "POST",
-        body: overpassQuery,
-        headers: { "Content-Type": "text/plain" },
-      });
-
-      const overpassData = await overpassRes.json();
-
-      const results: Place[] = await Promise.all(
-        (overpassData.elements || [])
-          .filter((el: any) => el.tags?.name)
-          .map(async (el: any, idx: number) => {
-            const name = el.tags.name;
-            const image = await fetchPlaceImageByName([name, searchQuery]);
-
-            return {
-              id: String(el.id ?? idx),
-              name,
-              lat: el.lat || el.center?.lat,
-              lon: el.lon || el.center?.lon,
-              image,
-              description: el.tags?.description || el.tags?.note || "",
-            };
-          })
-      );
-
-      setSearchResults(results);
-      setLocation(searchQuery);
+      setSearchMode({ query: q, district, lat, lon });
+      setActiveCategory("all");
+      setLocation(q);
     } catch {
-      setSearchResults([]);
+      setSearchMode(null);
     } finally {
       setLoading(false);
     }
   };
 
+  const clearSearch = () => {
+    setSearchQuery("");
+    setSearchMode(null);
+    setLocation(detectedDistrict ? `${detectedDistrict} District` : "Colombo District");
+  };
+
+  // Push to details — includes dummy=1 flag for seed places
   const pushToDetails = (place: Place) => {
+    const isDummy = place.id?.toString().startsWith("seed-") ? "1" : "0";
+
     const url =
       `/place/${place.id}` +
       `?name=${encodeURIComponent(place.name)}` +
@@ -1419,14 +911,17 @@ export default function HomePage() {
       `&image=${encodeURIComponent(place.image || "/fallback.jpg")}` +
       `&busy=${encodeURIComponent(place.busyLevel || "")}` +
       `&confidence=${encodeURIComponent(String(place.confidence ?? ""))}` +
-      `&updated=${encodeURIComponent(place.lastUpdated || "")}`;
+      `&updated=${encodeURIComponent(place.lastUpdated || "")}` +
+      `&district=${encodeURIComponent(place.district || "")}` +
+      `&category=${encodeURIComponent(place.category || "")}` +
+      `&dummy=${isDummy}`;
 
     router.push(url);
   };
 
   const showDetectedCard = useMemo(
-    () => !!detectedCity && !detectingCity,
-    [detectedCity, detectingCity]
+    () => !!detectedCity && !detectingCity && !searchMode,
+    [detectedCity, detectingCity, searchMode]
   );
 
   const busyBadgeClass = (lvl?: string) => {
@@ -1474,19 +969,14 @@ export default function HomePage() {
   ];
 
   const bannerAlert = useMemo(
-    () => notifications.find((n) => n.type === "weather" && n.id !== "weather-now") ||
+    () =>
+      notifications.find((n) => n.type === "weather" && n.id !== "weather-now") ||
       notifications.find((n) => n.type === "safety"),
     [notifications]
   );
 
-  const eventAlert = useMemo(
-    () => notifications.find((n) => n.type === "event"),
-    [notifications]
-  );
+  const eventAlert = useMemo(() => notifications.find((n) => n.type === "event"), [notifications]);
 
-  // ------------------------------------------------------------------
-  // Save detected-city busy level to DB (real crowd report) + profile
-  // ------------------------------------------------------------------
   const saveDetectedBusyLevel = async () => {
     if (!detectedCity || !detectedBusy) return;
     setSavingFeedback(true);
@@ -1508,18 +998,12 @@ export default function HomePage() {
         district: detectedDistrict || null,
       };
 
-      // 1) Update user profile with last location + busy level
       await fetch("/api/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          uid,
-          email,
-          lastLocation,
-        }),
+        body: JSON.stringify({ uid, email, lastLocation }),
       });
 
-      // 2) Submit as a crowd report so other users benefit (persistent)
       try {
         await fetch("/api/crowd", {
           method: "POST",
@@ -1535,14 +1019,13 @@ export default function HomePage() {
             source: "user_feedback",
           }),
         });
-      } catch {
-        // non-critical — profile save already succeeded
+      } catch { }
+
+      if (typeof window !== "undefined") {
+        (window as any).__lastLocation = lastLocation;
       }
 
-      // 3) Reflect in UI
-      setDetectedCity((prev) =>
-        prev ? { ...prev, busyLevel: detectedBusy } : prev
-      );
+      setDetectedCity((prev) => (prev ? { ...prev, busyLevel: detectedBusy } : prev));
       setShowDetectedModal(false);
       setDetectedBusy("");
     } catch (err) {
@@ -1551,6 +1034,12 @@ export default function HomePage() {
       setSavingFeedback(false);
     }
   };
+
+  const activeLocationLabel = searchMode
+    ? `${searchMode.query} (${searchMode.district} District)`
+    : detectedDistrict
+      ? `${detectedDistrict} District`
+      : null;
 
   return (
     <ProtectedRoute>
@@ -1585,19 +1074,28 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Detected district label */}
-        {detectedDistrict && (
-          <p className="text-xs text-gray-500 mb-3">
-            📍 Showing places near <span className="font-semibold text-gray-700">{detectedDistrict} District</span>
-          </p>
+        {/* Active location */}
+        {activeLocationLabel && (
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <p className="text-xs text-gray-500">
+              📍 Showing places near{" "}
+              <span className="font-semibold text-gray-700">{activeLocationLabel}</span>
+            </p>
+            {searchMode && (
+              <button
+                onClick={clearSearch}
+                className="text-[10px] px-2 py-0.5 rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+              >
+                Clear search ✕
+              </button>
+            )}
+          </div>
         )}
 
-        {/* Weather / safety banner (real-time) */}
+        {/* Weather banner */}
         {bannerAlert && (
           <div className="mb-3 flex items-start gap-2 p-3 rounded-xl border border-amber-200 bg-amber-50">
-            <span className="text-lg leading-none mt-0.5">
-              {notificationIcon(bannerAlert.type)}
-            </span>
+            <span className="text-lg leading-none mt-0.5">{notificationIcon(bannerAlert.type)}</span>
             <div className="flex-1 text-sm">
               <p className="font-semibold text-amber-900">{bannerAlert.title}</p>
               <p className="text-amber-800">{bannerAlert.message}</p>
@@ -1605,7 +1103,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Event / festival chip (real-time) */}
+        {/* Event chip */}
         {eventAlert && (
           <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-xl border border-fuchsia-200 bg-fuchsia-50 text-sm">
             <span>{notificationIcon(eventAlert.type)}</span>
@@ -1620,6 +1118,9 @@ export default function HomePage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSearch();
+            }}
             placeholder="Type city or place name..."
             className="flex-1 p-2 border text-gray-500 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#16a085]"
           />
@@ -1661,7 +1162,7 @@ export default function HomePage() {
           </button>
         </div>
 
-        {/* Category filter chips */}
+        {/* Category chips */}
         <div className="flex gap-2 mb-5 overflow-x-auto hide-scrollbar">
           {categories.map((c) => {
             const active = activeCategory === c.key;
@@ -1670,8 +1171,8 @@ export default function HomePage() {
                 key={c.key}
                 onClick={() => setActiveCategory(c.key)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs border transition ${active
-                  ? "bg-[#16a085] border-[#16a085] text-white"
-                  : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                    ? "bg-[#16a085] border-[#16a085] text-white"
+                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
                   }`}
               >
                 <span className="mr-1">{c.icon}</span>
@@ -1683,10 +1184,7 @@ export default function HomePage() {
 
         {error && <p className="text-red-600 mb-3">{error}</p>}
 
-        {/* (Removed) "Suggestions near {location}" search block —
-            the separate suggestions tab handles that. */}
-
-        {/* Hidden gems strip (only visible on All tab) — filtered by district */}
+        {/* Hidden gems strip */}
         {hiddenGems.length > 0 && activeCategory === "all" && (
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
@@ -1720,9 +1218,7 @@ export default function HomePage() {
                   </div>
                   <div className="p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-bold text-md text-gray-900 truncate">
-                        {place.name}
-                      </h3>
+                      <h3 className="font-bold text-md text-gray-900 truncate">{place.name}</h3>
                       {place.busyLevel && (
                         <span
                           className={`ml-auto text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap ${busyBadgeClass(
@@ -1734,9 +1230,7 @@ export default function HomePage() {
                       )}
                     </div>
                     {place.district && (
-                      <p className="text-[11px] text-gray-500 mt-0.5 truncate">
-                        {place.district}
-                      </p>
+                      <p className="text-[11px] text-gray-500 mt-0.5 truncate">{place.district}</p>
                     )}
                     <div className="mt-1.5 flex items-center justify-between text-[10px] text-gray-500">
                       {typeof place.confidence === "number" && (
@@ -1745,9 +1239,7 @@ export default function HomePage() {
                           {place.confidence}% confidence
                         </span>
                       )}
-                      {place.lastUpdated && (
-                        <span>{formatLastUpdated(place.lastUpdated)}</span>
-                      )}
+                      {place.lastUpdated && <span>{formatLastUpdated(place.lastUpdated)}</span>}
                     </div>
                   </div>
                 </div>
@@ -1764,9 +1256,9 @@ export default function HomePage() {
               · {categories.find((c) => c.key === activeCategory)?.label}
             </span>
           )}
-          {detectedDistrict && (
+          {(searchMode || detectedDistrict) && (
             <span className="ml-2 text-xs font-normal text-gray-500">
-              in {detectedDistrict}
+              in {searchMode ? searchMode.district : detectedDistrict}
             </span>
           )}
         </h2>
@@ -1790,9 +1282,7 @@ export default function HomePage() {
 
               <div className="p-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-md text-gray-900 truncate">
-                    {detectedCity.name}
-                  </h3>
+                  <h3 className="font-bold text-md text-gray-900 truncate">{detectedCity.name}</h3>
 
                   {detectedCity.busyLevel && (
                     <span
@@ -1814,7 +1304,7 @@ export default function HomePage() {
             </div>
           )}
 
-          {detectingCity && activeCategory === "all" && (
+          {detectingCity && activeCategory === "all" && !searchMode && (
             <div className="w-60 flex-shrink-0 rounded-2xl bg-white border border-gray-100 shadow-md p-4">
               <div className="animate-pulse space-y-2">
                 <div className="h-36 bg-gray-200 rounded-xl" />
@@ -1848,10 +1338,7 @@ export default function HomePage() {
 
                 <div className="p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-bold text-md text-gray-900 truncate">
-                      {place.name}
-                    </h3>
-
+                    <h3 className="font-bold text-md text-gray-900 truncate">{place.name}</h3>
                     {place.busyLevel && (
                       <span
                         className={`ml-auto text-[10px] px-2 py-0.5 rounded-full border whitespace-nowrap ${busyBadgeClass(
@@ -1864,9 +1351,7 @@ export default function HomePage() {
                   </div>
 
                   {place.district && (
-                    <p className="text-[11px] text-gray-500 mt-0.5 truncate">
-                      {place.district}
-                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5 truncate">{place.district}</p>
                   )}
 
                   <div className="mt-1.5 flex items-center justify-between text-[10px] text-gray-500">
@@ -1876,9 +1361,7 @@ export default function HomePage() {
                         {place.confidence}% confidence
                       </span>
                     )}
-                    {place.lastUpdated && (
-                      <span>{formatLastUpdated(place.lastUpdated)}</span>
-                    )}
+                    {place.lastUpdated && <span>{formatLastUpdated(place.lastUpdated)}</span>}
                   </div>
                 </div>
               </div>
@@ -1888,8 +1371,7 @@ export default function HomePage() {
               <p className="text-gray-500 mt-10 text-center flex-shrink-0">
                 {activeCategory === "all"
                   ? "Detecting nearby places to visit..."
-                  : `No ${categories.find((c) => c.key === activeCategory)?.label
-                  } found in this area yet.`}
+                  : `No ${categories.find((c) => c.key === activeCategory)?.label} found in this area yet.`}
               </p>
             )
           )}
@@ -1900,9 +1382,7 @@ export default function HomePage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {detectedCity.name}
-                </h3>
+                <h3 className="text-lg font-semibold text-gray-900">{detectedCity.name}</h3>
                 <button
                   className="text-gray-500 hover:text-gray-800"
                   onClick={() => setShowDetectedModal(false)}
@@ -1924,9 +1404,7 @@ export default function HomePage() {
               </div>
 
               {detectedCity.desc && (
-                <p className="text-xs text-gray-600 mb-3 line-clamp-2">
-                  {detectedCity.desc}
-                </p>
+                <p className="text-xs text-gray-600 mb-3 line-clamp-2">{detectedCity.desc}</p>
               )}
 
               <p className="text-sm text-gray-600 mb-3">How busy is it right now?</p>
@@ -1938,9 +1416,8 @@ export default function HomePage() {
                     <button
                       key={lvl}
                       onClick={() => setDetectedBusy(lvl)}
-                      className={`px-3 py-2 rounded-lg border text-sm ${busyBadgeClass(
-                        lvl
-                      )} ${isActive ? "ring-2 ring-[#16a085]" : ""}`}
+                      className={`px-3 py-2 rounded-lg border text-sm ${busyBadgeClass(lvl)} ${isActive ? "ring-2 ring-[#16a085]" : ""
+                        }`}
                     >
                       {lvl}
                     </button>
@@ -1964,8 +1441,8 @@ export default function HomePage() {
                   disabled={!detectedBusy || savingFeedback}
                   onClick={saveDetectedBusyLevel}
                   className={`px-4 py-2 rounded-md text-white ${detectedBusy && !savingFeedback
-                    ? "bg-[#16a085] hover:bg-[#13856d]"
-                    : "bg-gray-300 cursor-not-allowed"
+                      ? "bg-[#16a085] hover:bg-[#13856d]"
+                      : "bg-gray-300 cursor-not-allowed"
                     }`}
                 >
                   {savingFeedback ? "Saving..." : "Submit"}
@@ -1996,10 +1473,8 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {detectedDistrict && (
-                <p className="text-xs text-gray-500 mb-3">
-                  Live alerts for {detectedCity?.name || detectedDistrict}
-                </p>
+              {activeLocationLabel && (
+                <p className="text-xs text-gray-500 mb-3">Live alerts for {activeLocationLabel}</p>
               )}
 
               {notifications.length === 0 ? (
@@ -2007,19 +1482,12 @@ export default function HomePage() {
               ) : (
                 <ul className="space-y-3">
                   {notifications.map((n) => (
-                    <li
-                      key={n.id}
-                      className="p-3 rounded-xl border border-gray-100 bg-gray-50"
-                    >
+                    <li key={n.id} className="p-3 rounded-xl border border-gray-100 bg-gray-50">
                       <div className="flex items-start gap-2">
-                        <span className="text-lg leading-none mt-0.5">
-                          {notificationIcon(n.type)}
-                        </span>
+                        <span className="text-lg leading-none mt-0.5">{notificationIcon(n.type)}</span>
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <p className="text-sm font-semibold text-gray-900">
-                              {n.title}
-                            </p>
+                            <p className="text-sm font-semibold text-gray-900">{n.title}</p>
                             <span className="text-[10px] text-gray-500">{n.time}</span>
                           </div>
                           <p className="text-xs text-gray-700 mt-0.5">{n.message}</p>
@@ -2031,8 +1499,8 @@ export default function HomePage() {
               )}
 
               <p className="text-[10px] text-gray-400 mt-5">
-                Alerts include quiet-time reminders, peak warnings, event/festival alerts,
-                and live weather & safety updates.
+                Alerts include quiet-time reminders, peak warnings, event/festival alerts, and live
+                weather & safety updates.
               </p>
             </div>
           </div>
@@ -2060,16 +1528,13 @@ export default function HomePage() {
               </div>
 
               <p className="text-xs text-gray-500 mb-3">
-                A few handy Sinhala and Tamil phrases — useful when signage or menus
-                aren't in English.
+                A few handy Sinhala and Tamil phrases — useful when signage or menus aren't in
+                English.
               </p>
 
               <div className="space-y-2">
                 {LANGUAGE_PHRASES.map((p) => (
-                  <div
-                    key={p.english}
-                    className="p-3 rounded-lg border border-gray-100 bg-gray-50"
-                  >
+                  <div key={p.english} className="p-3 rounded-lg border border-gray-100 bg-gray-50">
                     <p className="text-sm font-semibold text-gray-900">{p.english}</p>
                     <p className="text-xs text-gray-700 mt-1">
                       <span className="font-medium">SI:</span> {p.sinhala}
